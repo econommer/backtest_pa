@@ -32,7 +32,7 @@ class Metrics:
 class BacktestResult:
     """The complete, reproducible output of one backtest run."""
 
-    config: Mapping
+    config: Mapping[str, object]
     equity_curve: pd.Series
     metrics: Metrics
     benchmark_curve: pd.Series | None = None

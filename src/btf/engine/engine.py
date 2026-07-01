@@ -25,7 +25,7 @@ class Engine(Protocol):
         data: DataProvider,
         broker: Broker,
         sizer: PositionSizer,
-        config: Mapping,
+        config: Mapping[str, object],
     ) -> BacktestResult:
         """Run the full backtest and return its result. Enforces no look-ahead."""
         ...

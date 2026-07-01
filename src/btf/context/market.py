@@ -19,4 +19,4 @@ class MarketContext:
     regime: Regime
     index_trend: float | None = None
     breadth: float | None = None
-    meta: dict = field(default_factory=dict)
+    meta: dict[str, object] = field(default_factory=dict)

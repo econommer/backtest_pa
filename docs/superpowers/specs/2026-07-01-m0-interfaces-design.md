@@ -212,6 +212,8 @@ Those are M1+ per plan §9. M0 ends when the contract tests pass green against i
 
 ## 11. Brain traceability
 
-Docstrings cite: `relative-strength`, `initial-stop-and-r-multiple`, `expectancy-and-position-sizing`,
-`trailing-stops`, `gap-risk`, `situation-awareness`, setup `vcp-breakout`, playbook
-`momentum-trend-trading-system`.
+Docstrings at M0 cite the pages that map to a frozen interface: `initial-stop-and-r-multiple`
+(Signal.stop_price), `expectancy-and-position-sizing` (Order.risk_per_share / PositionSizer / Metrics),
+`gap-risk` (Broker.sweep_stops, DataProvider.earnings_dates), `situation-awareness` (MarketContext),
+setup `vcp-breakout` (Trade template). Deferred to the strategy/behavior milestones (M4+), so not yet
+cited in code: `relative-strength` (RS ranking) and `trailing-stops` (trail exits).

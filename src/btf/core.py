@@ -83,7 +83,7 @@ class Signal:
     stop_price: float | None = None
     sizing_hint: float | None = None
     reason: str = ""
-    meta: dict = field(default_factory=dict)
+    meta: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +103,7 @@ class Order:
     stop_price: float | None
     risk_per_share: float
     reason: str = ""
-    meta: dict = field(default_factory=dict)
+    meta: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
