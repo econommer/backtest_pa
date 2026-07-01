@@ -60,7 +60,9 @@ def normalize_ohlcv(
     idx = pd.DatetimeIndex(df.index)
     if idx.tz is not None:
         idx = idx.tz_localize(None)
-    df.index = idx.normalize()
+    # Canonical unit = seconds: matches a date-based DatetimeIndex and the cache
+    # read-back, so output is identical regardless of the vendor's resolution.
+    df.index = idx.normalize().as_unit("s")
     df.index.name = "ts"
 
     df = df.astype(float)
