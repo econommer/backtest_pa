@@ -1,0 +1,174 @@
+"""``BasicEngine`` — the concrete event-driven daily loop (implements Engine).
+
+Advances the clock bar-by-bar and stays strategy-agnostic: it feeds a ``Context``,
+collects ``Signal``s, sizes, simulates fills, bookkeeps via ``Portfolio``, and
+computes ``BacktestResult``. It knows nothing about "buy-and-hold" or "VCP".
+
+Anti-look-ahead: a strategy decides on bar *t*'s close; its orders fill at bar
+*t+1*'s open (carried in ``pending_orders``). See M1 design spec §4.
+"""
+from __future__ import annotations
+
+from datetime import date
+from typing import Mapping, Sequence, cast
+
+import pandas as pd
+
+from btf.context.backtest_context import BacktestContext
+from btf.context.market import MarketContext
+from btf.core import Bar, FillKind, Order, Regime
+from btf.broker.broker import Broker
+from btf.data.provider import DataProvider
+from btf.metrics.compute import compute_metrics
+from btf.metrics.result import BacktestResult
+from btf.portfolio.portfolio import Portfolio
+from btf.risk.sizer import PositionSizer
+from btf.strategies.base import Strategy
+
+
+class BasicEngine:
+    """Runs one backtest over a strategy, data, broker, and sizer."""
+
+    def run(
+        self,
+        strategy: Strategy,
+        data: DataProvider,
+        broker: Broker,
+        sizer: PositionSizer,
+        config: Mapping[str, object],
+    ) -> BacktestResult:
+        start: date = config["start"]  # type: ignore[assignment]
+        end: date = config["end"]  # type: ignore[assignment]
+        starting_cash = float(config["starting_cash"])  # type: ignore[arg-type]
+        cfg_symbols = config.get("symbols")
+        symbols = (
+            list(cast(Sequence[str], cfg_symbols)) if cfg_symbols else list(data.universe(start))
+        )
+
+        store = self._build_store(data, symbols, start, end)
+        calendar = data.trading_calendar(start, end)
+        portfolio = Portfolio(starting_cash)
+        pending_orders: list[Order] = []
+
+        last_t = calendar[-1] if calendar else None
+        for idx, t in enumerate(calendar):
+            bars_t = self._bars_on(store, symbols, t)
+
+            # 2. Execute orders decided yesterday, at today's open.
+            order_by_symbol = {o.symbol: o for o in pending_orders}
+            for fill in broker.execute(pending_orders, bars_t):
+                if fill.kind in (FillKind.ENTRY, FillKind.ADD):
+                    portfolio.apply_entry(fill, order_by_symbol[fill.symbol])
+                else:
+                    portfolio.apply_exit(fill)
+
+            # 3. Sweep resting stops against today's bar (after fills → no double-close).
+            for fill in broker.sweep_stops(portfolio.snapshot_positions(), bars_t):
+                portfolio.apply_exit(fill)
+
+            # 4. Mark-to-market at today's close and record equity.
+            closes = {sym: bar.close for sym, bar in bars_t.items()}
+            equity = portfolio.mark(closes)
+            portfolio.record_equity(t, equity)
+
+            # 5. Build the as-of context (the firewall slices the store to <= t).
+            ctx = BacktestContext(
+                store=store,
+                as_of=t,
+                cash=portfolio.cash,
+                equity=equity,
+                positions=portfolio.snapshot_positions(),
+                market=MarketContext(as_of=t, regime=Regime.UNKNOWN),
+                universe=data.universe(t),
+            )
+
+            # 6-7. Ask the strategy, size the signals.
+            signals = strategy.on_bar(ctx) if idx >= strategy.warmup_bars else []
+            orders = sizer.size(signals, ctx)
+
+            # 8. Carry to tomorrow's open — orders decided on the final bar have no t+1
+            #    to fill against, so they are intentionally dropped.
+            pending_orders = [] if t == last_t else orders
+
+        # After the loop: force-liquidate any open lots at the final bar's close (D1).
+        if last_t is not None:
+            self._force_liquidate(portfolio, store, last_t)
+
+        equity_curve = self._equity_series(portfolio)
+        metrics = compute_metrics(portfolio.trades, equity_curve)
+        return BacktestResult(
+            config=config,
+            equity_curve=equity_curve,
+            metrics=metrics,
+            trades=portfolio.trades,
+        )
+
+    # ---- helpers -------------------------------------------------------------
+
+    @staticmethod
+    def _build_store(
+        data: DataProvider, symbols: list[str], start: date, end: date
+    ) -> dict[str, pd.DataFrame]:
+        hist = data.history(symbols, start, end)
+        store: dict[str, pd.DataFrame] = {}
+        if len(hist) == 0:
+            return store
+        for sym, group in hist.groupby(level="symbol"):
+            frame = group.droplevel("symbol").sort_index()
+            store[sym] = frame
+        return store
+
+    @staticmethod
+    def _bars_on(store: Mapping[str, pd.DataFrame], symbols: list[str], t: date) -> dict[str, Bar]:
+        ts = pd.Timestamp(t)
+        bars: dict[str, Bar] = {}
+        for sym in symbols:
+            df = store.get(sym)
+            if df is None or ts not in df.index:
+                continue
+            row = df.loc[ts]
+            bars[sym] = Bar(
+                symbol=sym,
+                ts=t,
+                open=float(row["open"]),
+                high=float(row["high"]),
+                low=float(row["low"]),
+                close=float(row["close"]),
+                volume=float(row["volume"]),
+            )
+        return bars
+
+    @staticmethod
+    def _force_liquidate(portfolio: Portfolio, store: Mapping[str, pd.DataFrame], t: date) -> None:
+        from btf.core import Direction, Fill
+
+        ts = pd.Timestamp(t)
+        for sym in portfolio.open_symbols():
+            df = store.get(sym)
+            if df is None:
+                continue
+            row = df.loc[ts] if ts in df.index else df.loc[:ts].iloc[-1]
+            close = float(row["close"])
+            pos = portfolio.snapshot_positions()[sym]
+            portfolio.apply_exit(
+                Fill(
+                    symbol=sym,
+                    ts=t,
+                    price=close,
+                    quantity=pos.quantity,
+                    direction=Direction.LONG,
+                    kind=FillKind.EXIT,
+                    reason="final liquidation",
+                )
+            )
+        # Final equity reflects the post-liquidation flat book (all cash).
+        if portfolio.equity_curve:
+            portfolio.equity_curve[-1] = (portfolio.equity_curve[-1][0], portfolio.cash)
+
+    @staticmethod
+    def _equity_series(portfolio: Portfolio) -> pd.Series:
+        if not portfolio.equity_curve:
+            return pd.Series(dtype=float)
+        dates = [d for d, _ in portfolio.equity_curve]
+        values = [v for _, v in portfolio.equity_curve]
+        return pd.Series(values, index=pd.DatetimeIndex(dates), name="equity")
