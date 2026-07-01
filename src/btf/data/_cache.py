@@ -3,7 +3,7 @@
 Cache-hit reads skip the network entirely, so reruns are fast and — crucially —
 *deterministic*: a backtest run pins its data snapshot to whatever parquet files
 sit in the cache directory. Commit the cache dir (or point runs at a shared one)
-to freeze the snapshot for reproducibility (BACKTESTING_PLAN.md §0.5).
+to freeze the snapshot for reproducibility (BACKTESTING_PLAN.md §0, principle 5).
 
 Frames are stored already-normalized (see ``_normalize``); the read path returns
 them ready to serve.

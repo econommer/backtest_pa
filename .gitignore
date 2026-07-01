@@ -16,3 +16,8 @@ venv/
 
 # OS / editor
 .DS_Store
+
+# Fetched data snapshot cache (see scripts/fetch_snapshot.py). Ignored by default
+# to avoid committing large/stale binaries; to *pin* a snapshot either keep this
+# dir around, point BTF_CACHE_DIR at a shared copy, or force-add it intentionally.
+data_cache/
