@@ -6,7 +6,7 @@ import pytest
 
 from btf.context.context import Context
 from btf.context.market import MarketContext
-from btf.core import Bar, Regime
+from btf.core import Regime
 
 
 def test_market_context_fields_and_defaults():
