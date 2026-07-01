@@ -28,6 +28,7 @@ class _OpenLot:
     cost_paid: float
     reason_entry: str
     direction: Direction
+    entry_regime: Regime
 
 
 class Portfolio:
@@ -39,8 +40,12 @@ class Portfolio:
         self.equity_curve: list[tuple[date, float]] = []
         self.trades: list[Trade] = []
 
-    def apply_entry(self, fill: Fill, order: Order) -> None:
-        """Open a lot from an ENTRY fill; debit cash; denominate R by the actual fill."""
+    def apply_entry(self, fill: Fill, order: Order, regime: Regime = Regime.UNKNOWN) -> None:
+        """Open a lot from an ENTRY fill; debit cash; denominate R by the actual fill.
+
+        ``regime`` is the market regime on the entry-fill day; a trade carries the
+        regime it was opened in (M3 design spec E3).
+        """
         if order.stop_price is None:
             raise ValueError(f"entry order for {fill.symbol} has no stop_price")
         self.cash -= fill.price * fill.quantity + fill.commission
@@ -54,6 +59,7 @@ class Portfolio:
             cost_paid=fill.commission,
             reason_entry=order.reason,
             direction=order.direction,
+            entry_regime=regime,
         )
 
     def apply_exit(self, fill: Fill) -> None:
@@ -84,7 +90,7 @@ class Portfolio:
                 initial_stop=lot.stop_price,
                 r_multiple=r_multiple,
                 pnl=pnl,
-                regime=Regime.UNKNOWN,
+                regime=lot.entry_regime,
                 reason_entry=lot.reason_entry,
                 reason_exit=fill.reason,
             )

@@ -28,6 +28,20 @@ def uptrend_provider(symbol: str = "AAA", days: int = 10) -> InMemoryDataProvide
     return InMemoryDataProvider({symbol: make_frame(dates, opens, highs, lows, closes)})
 
 
+def uptrend_provider_with_benchmark(
+    symbol: str = "AAA", days: int = 8
+) -> InMemoryDataProvider:
+    """One up-trending symbol plus a strictly rising benchmark series (for regime tests)."""
+    dates = [date(2020, 1, d) for d in range(1, days + 1)]
+    opens = [100.0 + i for i in range(days)]
+    closes = [100.5 + i for i in range(days)]
+    highs = [c + 1.0 for c in closes]
+    lows = [o - 1.0 for o in opens]
+    frame = make_frame(dates, opens, highs, lows, closes)
+    bench = pd.Series([1000.0 + 10 * i for i in range(days)], index=pd.DatetimeIndex(dates))
+    return InMemoryDataProvider({symbol: frame}, benchmark=bench)
+
+
 def gap_through_provider(symbol: str = "AAA") -> InMemoryDataProvider:
     """Up for a few bars (so an entry fills), then a gap-down that jumps a resting stop."""
     dates = [date(2020, 1, d) for d in range(1, 7)]

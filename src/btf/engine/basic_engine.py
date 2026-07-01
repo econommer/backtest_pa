@@ -19,15 +19,20 @@ from btf.context.market import MarketContext
 from btf.core import Bar, FillKind, Order, Regime
 from btf.broker.broker import Broker
 from btf.data.provider import DataProvider
-from btf.metrics.compute import compute_metrics
+from btf.metrics.compute import compute_metrics, compute_regime_breakdown
 from btf.metrics.result import BacktestResult
 from btf.portfolio.portfolio import Portfolio
+from btf.regime.classifier import RegimeClassifier, SmaRegimeClassifier
 from btf.risk.sizer import PositionSizer
 from btf.strategies.base import Strategy
 
 
 class BasicEngine:
     """Runs one backtest over a strategy, data, broker, and sizer."""
+
+    def __init__(self, classifier: RegimeClassifier | None = None) -> None:
+        # Pluggable regime engine; run()'s frozen signature stays untouched (M3 E2).
+        self._classifier: RegimeClassifier = classifier or SmaRegimeClassifier()
 
     def run(
         self,
@@ -50,15 +55,24 @@ class BasicEngine:
         portfolio = Portfolio(starting_cash)
         pending_orders: list[Order] = []
 
+        benchmark_name = config.get("benchmark")
+        benchmark = data.index(cast(str, benchmark_name), start, end) if benchmark_name else None
+        day_regimes: dict[date, Regime] = {}
+
         last_t = calendar[-1] if calendar else None
         for idx, t in enumerate(calendar):
             bars_t = self._bars_on(store, symbols, t)
+
+            # 0. Classify the market regime from benchmark history <= t (same firewall as
+            #    prices). Done first so entries filled today are tagged look-ahead-free.
+            regime_t, index_trend_t = self._classify(benchmark, t)
+            day_regimes[t] = regime_t
 
             # 2. Execute orders decided yesterday, at today's open.
             order_by_symbol = {o.symbol: o for o in pending_orders}
             for fill in broker.execute(pending_orders, bars_t):
                 if fill.kind in (FillKind.ENTRY, FillKind.ADD):
-                    portfolio.apply_entry(fill, order_by_symbol[fill.symbol])
+                    portfolio.apply_entry(fill, order_by_symbol[fill.symbol], regime_t)
                 else:
                     portfolio.apply_exit(fill)
 
@@ -78,7 +92,7 @@ class BasicEngine:
                 cash=portfolio.cash,
                 equity=equity,
                 positions=portfolio.snapshot_positions(),
-                market=MarketContext(as_of=t, regime=Regime.UNKNOWN),
+                market=MarketContext(as_of=t, regime=regime_t, index_trend=index_trend_t),
                 universe=data.universe(t),
             )
 
@@ -96,14 +110,51 @@ class BasicEngine:
 
         equity_curve = self._equity_series(portfolio)
         metrics = compute_metrics(portfolio.trades, equity_curve)
+        # M3: populate the two fields M1 stubbed — only when a benchmark was configured.
+        benchmark_curve = (
+            self._benchmark_curve(benchmark, equity_curve, starting_cash)
+            if benchmark_name
+            else None
+        )
+        regime_breakdown = (
+            compute_regime_breakdown(portfolio.trades, equity_curve, day_regimes)
+            if benchmark_name
+            else {}
+        )
         return BacktestResult(
             config=config,
             equity_curve=equity_curve,
             metrics=metrics,
             trades=portfolio.trades,
+            benchmark_curve=benchmark_curve,
+            regime_breakdown=regime_breakdown,
         )
 
     # ---- helpers -------------------------------------------------------------
+
+    def _classify(self, benchmark: pd.Series | None, t: date) -> tuple[Regime, float | None]:
+        if benchmark is None:
+            return Regime.UNKNOWN, None
+        history = benchmark.loc[: pd.Timestamp(t)]  # index sorted → strictly <= t
+        return self._classifier.classify(history)
+
+    @staticmethod
+    def _benchmark_curve(
+        benchmark: pd.Series | None, equity_curve: pd.Series, starting_cash: float
+    ) -> pd.Series | None:
+        """Buy-and-hold-the-index equity, normalised to ``starting_cash`` (M3 E4)."""
+        if benchmark is None or len(benchmark) == 0 or len(equity_curve) == 0:
+            return None
+        bench = benchmark.copy()
+        bench.index = pd.DatetimeIndex(bench.index)
+        aligned = bench.reindex(equity_curve.index, method="ffill").bfill()
+        first = aligned.first_valid_index()
+        if first is None:
+            return None
+        base = float(aligned.loc[first])
+        if base == 0:
+            return None
+        return (starting_cash * aligned / base).rename("benchmark")
 
     @staticmethod
     def _build_store(

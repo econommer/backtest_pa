@@ -7,10 +7,11 @@ spec §5.6, decision D2.
 from __future__ import annotations
 
 from datetime import date
+from typing import Mapping
 
 import pandas as pd
 
-from btf.core import Trade
+from btf.core import Regime, Trade
 from btf.metrics.result import Metrics
 
 
@@ -62,6 +63,33 @@ def compute_metrics(trades: list[Trade], equity_curve: pd.Series) -> Metrics:
         max_drawdown_pct=max_dd_pct,
         exposure=exposure,
     )
+
+
+def compute_regime_breakdown(
+    trades: list[Trade],
+    equity_curve: pd.Series,
+    day_regimes: Mapping[date, Regime],
+) -> dict[Regime, Metrics]:
+    """Per-regime ``Metrics``: each regime's trades + its tagged equity-curve days (M3 §4.2).
+
+    Trade-derived fields are exact; equity-derived fields (drawdown %, exposure) are
+    computed over that regime's (possibly non-contiguous) days — approximate but honest.
+    """
+    regimes = {t.regime for t in trades}
+    breakdown: dict[Regime, Metrics] = {}
+    for r in regimes:
+        r_trades = [t for t in trades if t.regime == r]
+        if len(equity_curve):
+            keep = [
+                (ts.date() if hasattr(ts, "date") else ts) in day_regimes
+                and day_regimes[ts.date() if hasattr(ts, "date") else ts] == r
+                for ts in equity_curve.index
+            ]
+            r_equity = equity_curve[keep]
+        else:
+            r_equity = equity_curve
+        breakdown[r] = compute_metrics(r_trades, r_equity)
+    return breakdown
 
 
 def _max_losing_streak(trades: list[Trade]) -> int:
