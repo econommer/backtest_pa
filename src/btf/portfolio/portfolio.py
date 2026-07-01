@@ -48,7 +48,13 @@ class Portfolio:
         """
         if order.stop_price is None:
             raise ValueError(f"entry order for {fill.symbol} has no stop_price")
-        self.cash -= fill.price * fill.quantity + fill.commission
+        # Fill-time cash guard: the sizer budgeted against the t-close price, but
+        # this fill is the t+1 open — a gap up can cost more than the cash on hand.
+        # Skip the entry entirely rather than let cash go negative (M2 decision).
+        gross = fill.price * fill.quantity + fill.commission
+        if gross > self.cash:
+            return
+        self.cash -= gross
         self._lots[fill.symbol] = _OpenLot(
             symbol=fill.symbol,
             quantity=fill.quantity,
