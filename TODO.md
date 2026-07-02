@@ -2,6 +2,8 @@
 
 Parked items — **not now**. Revisit **after the engine is complete** (M1 done; ideally through M4 VCP so the design has proven itself on a real strategy).
 
+> **Status 2026-07-02:** the M4 condition is met — the engine + VCP are done. Item 1 is partially covered by the rewritten README (architecture, worked example, roadmap); what remains is keeping it in sync. Item 2 is scheduled as **M7**, behind M5 (bias defenses) and M6 (survivorship-free data), per BACKTESTING_PLAN.md §9.
+
 ---
 
 ## 1. Project overview / design doc  ⏸ deferred

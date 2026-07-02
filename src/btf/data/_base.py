@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Sequence
 
 import pandas as pd
 

@@ -2,7 +2,7 @@
 
 > Goal: turn the knowledge in the brain (`wiki/`) into a **reproducible, quantitatively verifiable** backtesting system.
 > Related brain pages: `momentum-trend-trading-system`, each setup's Evidence section, `expectancy-and-position-sizing`, `risk-management-vs-setup`.
-> Status: **plan only, no code written yet.** Section 10 lists open questions; locked decisions are in "Decision Log" below.
+> Status: **M0–M4 implemented** (see §9 and the README roadmap); next is **M5 — bias defenses**. Locked decisions are in "Decision Log" below.
 
 ---
 
@@ -14,7 +14,7 @@
 | 2 | Engine | **Build a lightweight custom event-driven engine** (best fit for the brain's concepts: R-based sizing, gap-through stops, a generic Strategy interface). |
 | 3 | First VCP scope | **Daily bars + US equities + VCP; Relative Strength approximated by whole-universe ROC ranking** (a faithful approximation of IBD RS — see brain `relative-strength`). **Industry RS deferred to Phase 2** (needs point-in-time industry data, which free sources can't provide reliably; forcing it would introduce look-ahead bias). |
 
-> Still open: Section 10 Q5 (whether `code/` becomes its own git repo).
+> Q5 resolved in practice: the framework lives in its own git repo (`backtest_pa`), separate from the brain.
 
 ---
 
@@ -216,12 +216,12 @@ code/
 
 ## 9. Milestones
 
-- **M0 — Freeze interfaces:** freeze `DataProvider` / `Strategy` / `Engine` / `Broker` / `BacktestResult` (incl. `Signal` / `Context` fields). No implementation yet.
-- **M1 — Skeleton + fake data:** engine runs a dummy strategy (buy-and-hold) end-to-end; "runs" = books reconcile.
-- **M2 — Phase 1 data:** yfinance/Stooq adapter + fixed universe.
-- **M3 — Metrics:** R-stats / expectancy / drawdown / regime breakdown + report.
-- **M4 — VCP strategy:** mechanize + first report (Phase-1 biases clearly flagged).
-- **M5 — Bias defenses:** walk-forward, out-of-sample, sensitivity.
+- ✅ **M0 — Freeze interfaces:** freeze `DataProvider` / `Strategy` / `Engine` / `Broker` / `BacktestResult` (incl. `Signal` / `Context` fields). No implementation yet.
+- ✅ **M1 — Skeleton + fake data:** engine runs a dummy strategy (buy-and-hold) end-to-end; "runs" = books reconcile.
+- ✅ **M2 — Phase 1 data:** yfinance/Stooq adapter + fixed universe.
+- ✅ **M3 — Metrics:** R-stats / expectancy / drawdown / regime breakdown + report.
+- ✅ **M4 — VCP strategy:** mechanize + first report (Phase-1 biases clearly flagged).
+- ⏭ **M5 — Bias defenses (next):** walk-forward, out-of-sample, sensitivity — plus the config-YAML run definition (§0 principle 5) as the substrate for parameter sweeps.
 - **M6 — Phase 2 data:** swap to a survivorship-free provider, produce the "credible" report, backfill the brain Evidence.
 - **M7 — Add more strategies** (Pocket Pivot / Buyable Gap Up) → compare directly via brain `setup-scorecard`.
 
@@ -233,6 +233,6 @@ code/
 2. ~~Custom engine vs. existing lib~~ — **DECIDED:** custom lightweight engine.
 3. ~~First VCP scope~~ — **DECIDED:** daily + US equities + VCP; RS via whole-universe ROC; industry RS in Phase 2.
 4. **VCP rule simplifications for v1** — confirm: OK to approximate IBD RS with universe ROC ranking and skip industry RS for now? (Tentatively yes, per Decision #3.)
-5. **Should `code/` become its own git repo** (version-controlled separately from the brain)?
+5. ~~Should `code/` become its own git repo~~ — **DECIDED (in practice):** yes; the framework is the standalone `backtest_pa` repo, versioned separately from the brain.
 
 > You said "let's plan slowly," so this is a v0.2 draft. Tell me what to change / sign off, and I'll produce v0.3 and start drafting the M0 interfaces.

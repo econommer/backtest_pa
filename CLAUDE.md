@@ -15,12 +15,13 @@ A **reproducible, quantitatively verifiable backtesting framework** that operati
 ## Non-negotiable architecture principle
 **Strategy ⟂ Engine.** The engine knows nothing about "VCP." It feeds data, collects a strategy's *intentions* (`Signal`s), simulates execution + bookkeeping, and computes metrics. Strategies live in `src/btf/strategies/` and depend only on the `Strategy` interface + the `Context` the engine passes in. Data access goes through the `DataProvider` interface — never bind a strategy or the engine to a specific vendor.
 
-## Layout (target — see plan §8)
+## Layout (see plan §8)
 ```
-src/btf/{data,engine,broker,risk,portfolio,context,metrics,strategies}
-config/         # one YAML = one fully-defined run
-tests/          # invariants (esp. no look-ahead)
-notebooks/
+src/btf/{data,engine,broker,risk,portfolio,context,regime,metrics,strategies}
+scripts/        # runnable entry points (fetch_snapshot, run_vcp, run_asset_classes)
+tests/          # invariants (esp. no look-ahead) — run: python -m pytest
+docs/superpowers/{plans,specs}/   # per-milestone design docs
+config/         # (target) one YAML = one fully-defined run — not built yet, lands with M5
 ```
 
 ## Conventions
@@ -39,7 +40,9 @@ notebooks/
 `../wiki/concepts/relative-strength.md`, `initial-stop-and-r-multiple.md`, `expectancy-and-position-sizing.md`, `trailing-stops.md`, `volatility-contraction.md`, `gap-risk.md`, `situation-awareness.md`; setup `../wiki/setups/vcp-breakout.md`; playbook `../wiki/playbooks/momentum-trend-trading-system.md`. When implementing a rule, trace it back to its source page.
 
 ## Status / next step
-Planning stage. Next milestone is **M0: freeze the interfaces** (`DataProvider` / `Strategy` / `Engine` / `Broker` / `BacktestResult`, incl. `Signal` / `Context` fields) — interfaces + docstrings only, no implementation.
+**M0–M4 done** (interfaces frozen → engine + fake data → yfinance/Stooq adapters + parquet cache → R-metrics/regime/benchmark → mechanized VCP with first real-data report; 83 tests green, `ruff` + `mypy src` clean). See README.md roadmap table and `docs/superpowers/` for the per-milestone designs.
+
+Next milestone is **M5: bias defenses** — in-sample/out-of-sample split, walk-forward, and parameter-sensitivity reporting on top of the existing engine (plan §6/§9). Config-driven YAML runs (core principle 5) are still unimplemented and are the natural substrate for M5's parameter sweeps — build that first.
 
 ## Tooling
 Recommended dev workflow plugin: **Superpowers** (TDD + planning methodology). Install it inside Claude Code — see `SETUP_SUPERPOWERS.md`.
