@@ -17,11 +17,11 @@ A **reproducible, quantitatively verifiable backtesting framework** that operati
 
 ## Layout (see plan §8)
 ```
-src/btf/{data,engine,broker,risk,portfolio,context,regime,metrics,strategies}
-scripts/        # runnable entry points (fetch_snapshot, run_vcp, run_asset_classes)
+src/btf/{data,engine,broker,risk,portfolio,context,regime,metrics,strategies,config,validation}
+scripts/        # runnable entry points (fetch_snapshot, run_vcp, run_asset_classes, run_config)
 tests/          # invariants (esp. no look-ahead) — run: python -m pytest
 docs/superpowers/{plans,specs}/   # per-milestone design docs
-config/         # (target) one YAML = one fully-defined run — not built yet, lands with M5
+config/         # one YAML = one fully-defined run (vcp_phase1.yaml is the reference)
 ```
 
 ## Conventions
@@ -40,9 +40,11 @@ config/         # (target) one YAML = one fully-defined run — not built yet, l
 `../wiki/concepts/relative-strength.md`, `initial-stop-and-r-multiple.md`, `expectancy-and-position-sizing.md`, `trailing-stops.md`, `volatility-contraction.md`, `gap-risk.md`, `situation-awareness.md`; setup `../wiki/setups/vcp-breakout.md`; playbook `../wiki/playbooks/momentum-trend-trading-system.md`. When implementing a rule, trace it back to its source page.
 
 ## Status / next step
-**M0–M4 done** (interfaces frozen → engine + fake data → yfinance/Stooq adapters + parquet cache → R-metrics/regime/benchmark → mechanized VCP with first real-data report; 83 tests green, `ruff` + `mypy src` clean). See README.md roadmap table and `docs/superpowers/` for the per-milestone designs.
+**M0–M5 done** (interfaces frozen → engine + fake data → yfinance/Stooq adapters + parquet cache → R-metrics/regime/benchmark → mechanized VCP with first real-data report → config-YAML runs + bias defenses; 121 tests green, `ruff` + `mypy src` clean). See README.md roadmap table and `docs/superpowers/` for the per-milestone designs.
 
-Next milestone is **M5: bias defenses** — in-sample/out-of-sample split, walk-forward, and parameter-sensitivity reporting on top of the existing engine (plan §6/§9). Config-driven YAML runs (core principle 5) are still unimplemented and are the natural substrate for M5's parameter sweeps — build that first.
+M5 shipped `btf.config` (YAML → `RunConfig` → engine; one YAML = one reproducible run) and `btf.validation` (IS/OOS split, walk-forward consistency, one-at-a-time parameter sensitivity; <30-trade rows flagged). Entry point: `python scripts/run_config.py config/vcp_phase1.yaml --validate`.
+
+Next milestone is **M6: Phase-2 data** — a survivorship-free provider (Norgate preferred, plan §3.3) behind the same `DataProvider` interface, then rerun the VCP config + validation protocol on it to produce the first *credible* report and backfill the brain's Evidence sections.
 
 ## Tooling
 Recommended dev workflow plugin: **Superpowers** (TDD + planning methodology). Install it inside Claude Code — see `SETUP_SUPERPOWERS.md`.

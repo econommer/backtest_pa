@@ -7,12 +7,12 @@ name = "btf"
 version = "0.0.0"
 description = "PA Strategy Backtesting Framework"
 requires-python = ">=3.11"
-dependencies = ["pandas>=2.0", "numpy>=1.24"]
+dependencies = ["pandas>=2.0", "numpy>=1.24", "pyyaml>=6.0"]
 
 [project.optional-dependencies]
 # Phase-1 free market-data adapters (yfinance primary; Stooq fallback uses pandas).
 data = ["yfinance>=0.2", "pyarrow>=15"]
-dev = ["pytest>=8.0", "mypy>=1.8", "ruff>=0.4", "yfinance>=0.2", "pyarrow>=15"]
+dev = ["pytest>=8.0", "mypy>=1.8", "ruff>=0.4", "yfinance>=0.2", "pyarrow>=15", "types-PyYAML"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/btf"]

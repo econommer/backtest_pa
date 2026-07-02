@@ -10,7 +10,7 @@ in **R units**, drawdown, and a benchmark you have to beat.
 > buy/sell advice. See [`CLAUDE.md`](CLAUDE.md) and [`BACKTESTING_PLAN.md`](BACKTESTING_PLAN.md).
 
 ```
-Python 3.11+  ·  type-hinted, Protocol-based interfaces  ·  83 tests green  ·  BuyAndHold + VCP  ·  no zipline/backtrader — custom event-driven engine
+Python 3.11+  ·  type-hinted, Protocol-based interfaces  ·  121 tests green  ·  BuyAndHold + VCP  ·  no zipline/backtrader — custom event-driven engine
 ```
 
 ---
@@ -61,6 +61,8 @@ src/btf/
   regime/      SMA-based market-regime classifier (for regime breakdown)
   metrics/     R-stats, expectancy, drawdown, benchmark → BacktestResult
   engine/      the event-driven daily loop that wires it all together
+  config/      YAML run definitions → RunConfig → engine (one YAML = one run)
+  validation/  M5 bias defenses: IS/OOS split, walk-forward, param sensitivity
 ```
 
 ---
@@ -132,6 +134,35 @@ for an equity momentum pattern. Books reconcile to the cent across all three.
 > credible number needs walk-forward + out-of-sample (M5) on survivorship-free data
 > (M6). This is the *first* VCP report, honestly flagged — not a validated strategy.
 
+### Config-driven runs + bias defenses (M5)
+
+**One YAML = one fully-defined run** (universe / period / costs / risk / strategy
+params / validation protocol) — same config + same data snapshot ⇒ same result.
+[`config/vcp_phase1.yaml`](config/vcp_phase1.yaml) is the reference config:
+
+```bash
+python scripts/run_config.py config/vcp_phase1.yaml             # base run
+python scripts/run_config.py config/vcp_phase1.yaml --validate  # + M5 bias defenses
+```
+
+`--validate` runs whichever defenses the YAML's `validation:` section defines,
+each through the same engine and look-ahead firewall as the base run:
+
+- **In-sample / out-of-sample split** (`oos_start`) — tune parameters on IS only;
+  OOS is spent once to confirm. IS good + OOS flat = overfit.
+- **Walk-forward** (`walk_forward_windows`) — the same fixed params run over N
+  contiguous windows; a real edge repeats window after window instead of one
+  lucky year carrying the aggregate.
+- **Parameter sensitivity** (`sensitivity`) — one-at-a-time sweeps around the
+  baseline; expectancy should degrade *gently* as a param moves. A cliff next to
+  the chosen value means the number was fit to noise.
+
+Every report row with fewer than 30 trades is flagged `!` — small samples are
+anecdote, not evidence (the brain's `expectancy-and-position-sizing` rule).
+Or drive it from Python: `btf.validation` exposes `run_oos_split`,
+`run_walk_forward`, and `run_sensitivity`, all taking a `RunConfig` and
+returning structured results.
+
 ### Backtest a strategy in code
 
 ```python
@@ -197,8 +228,8 @@ python scripts/fetch_snapshot.py     # writes ./data_cache/yfinance/*.parquet, t
 | **M2** | Phase-1 data — yfinance/Stooq adapters, parquet cache, pinned universe | ✅ done |
 | **M3** | Metrics — R-stats / expectancy / drawdown / regime breakdown + benchmark | ✅ done |
 | **M4** | VCP strategy — mechanized rules + first report (biases flagged) | ✅ done |
-| **M5** | **Bias defenses** — walk-forward, out-of-sample, parameter sensitivity | ⏭ **next** |
-| **M6** | Phase-2 data — survivorship-free provider, the "credible" report | ⬜ |
+| **M5** | Bias defenses — walk-forward, out-of-sample, parameter sensitivity + config-YAML runs | ✅ done |
+| **M6** | **Phase-2 data** — survivorship-free provider, the "credible" report | ⏭ **next** |
 | **M7** | More strategies — Pocket Pivot, Buyable Gap Up — compared on one engine | ⬜ |
 
 ---
@@ -210,7 +241,8 @@ python scripts/fetch_snapshot.py     # writes ./data_cache/yfinance/*.parquet, t
 - **Survivorship** — Phase 1 flags the bias loudly in every report; Phase 2 swaps in
   a delisted-inclusive universe.
 - **Overfitting** — in-sample/out-of-sample split, walk-forward, and
-  parameter-sensitivity reporting (M5); <30-trade samples treated conservatively.
+  parameter-sensitivity reporting (`btf.validation`, M5); <30-trade samples
+  flagged `!` in every report.
 - **Realistic costs** — slippage + commission + **gap-through stops** (a gap can jump
   a stop → fill at the open, not the stop price).
 
