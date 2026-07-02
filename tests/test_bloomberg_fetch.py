@@ -2,6 +2,7 @@
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from btf.data.bloomberg.fetch import (
     MEMBERSHIP_FILENAME,
@@ -12,7 +13,7 @@ from btf.data.bloomberg.fetch import (
     security_for,
     write_universe_file,
 )
-from btf.data.bloomberg.ledger import UsageLedger
+from btf.data.bloomberg.ledger import LedgerError, UsageLedger
 from tests.bloomberg_fixtures import FakeSession
 
 TODAY = date(2026, 7, 2)
@@ -52,6 +53,25 @@ def test_fetch_membership_writes_parquet_and_counts_one_security(tmp_path):
     # The whole membership history costs exactly ONE unique security (spec D3).
     assert ledger.known_count == 1
     assert ledger.new_securities(["SPX Index"]) == []
+
+
+def test_fetch_membership_raises_when_daily_budget_exhausted(tmp_path):
+    """Budget check must happen BEFORE session call."""
+    session = FakeSession(
+        members_by_month={
+            date(2020, 1, 31): ["AAA UW", "BBB UN"],
+        }
+    )
+    ledger = UsageLedger.load(tmp_path / "ledger.json")
+    # Pre-exhaust the budget by recording OTHER securities on TODAY.
+    ledger.record(["AAA US Equity"], on=TODAY)
+    # Now attempt to fetch with max_new_per_day=1; budget is full.
+    with pytest.raises(LedgerError, match="daily budget exhausted"):
+        fetch_membership(
+            session, ledger, tmp_path, date(2020, 1, 15), date(2020, 2, 15), on=TODAY, max_new_per_day=1
+        )
+    # Session was never called (budget check happened first).
+    assert session.calls == []
 
 
 def test_write_universe_file_sorted_unique(tmp_path):
