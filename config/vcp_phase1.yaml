@@ -1,0 +1,49 @@
+# One YAML = one fully-defined, reproducible run (core principle 5, plan §8).
+# Same config + same data snapshot (cache_dir) => same result.
+#
+#   python scripts/run_config.py config/vcp_phase1.yaml             # base run
+#   python scripts/run_config.py config/vcp_phase1.yaml --validate  # + M5 bias defenses
+#
+# [!] Phase-1 data: hand-picked, currently-listed symbols => survivorship /
+# selection bias; expectancy is upward-biased until M6's survivorship-free data.
+
+name: vcp-phase1-equities
+
+period:
+  start: 2015-01-01
+  end: 2025-01-01
+
+universe:
+  symbols:
+    [AAPL, MSFT, NVDA, AMZN, GOOGL, META, AVGO, TSLA, JPM, V,
+     MA, UNH, JNJ, XOM, CVX, HD, PG, KO, PEP, COST,
+     WMT, DIS, NFLX, AMD, CRM, ADBE, ORCL, CSCO, INTC, QCOM]
+
+data:
+  source: yfinance        # or: stooq
+  cache_dir: data_cache
+  benchmark: SPY
+
+costs:
+  commission_per_share: 0.005
+  slippage_pct: 0.0005
+
+risk:
+  risk_pct: 0.01
+  starting_cash: 100000
+
+strategy:
+  name: vcp
+  params: {}              # empty = the brain-derived defaults in VcpStrategy
+
+# M5 bias-defense protocol (plan §6). Each section is optional; --validate runs
+# whichever are present.
+validation:
+  oos_start: 2022-01-01           # tune on 2015-21 only; 2022-24 is spent once
+  walk_forward_windows: 5         # ~2y each; must exceed VCP warmup (~8 months)
+  sensitivity:                    # one-at-a-time around the baseline
+    tight_window: [6, 8, 10, 12, 14]
+    rs_min_percentile: [0.60, 0.70, 0.80]
+    stop_atr_mult: [0.5, 1.0, 1.5]
+    trail_ma: [20, 50]
+    vol_expansion: [1.1, 1.3, 1.5]

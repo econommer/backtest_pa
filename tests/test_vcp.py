@@ -57,7 +57,10 @@ def _synthetic_vcp() -> pd.DataFrame:
     vols: list[float] = []
 
     def push(c, h, low, v):
-        closes.append(c); highs.append(h); lows.append(low); vols.append(v)
+        closes.append(c)
+        highs.append(h)
+        lows.append(low)
+        vols.append(v)
 
     # Phase 1 — Stage-2 uptrend, 170 bars from 50 -> ~97 (SMA150 rising, price above it).
     for i in range(170):
