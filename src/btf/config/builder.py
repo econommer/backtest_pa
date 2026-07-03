@@ -51,9 +51,19 @@ def _stooq_provider(cfg: RunConfig) -> DataProvider:
     )
 
 
+def _bloomberg_provider(cfg: RunConfig) -> DataProvider:
+    from btf.data.bloomberg import BloombergSnapshotProvider
+
+    return BloombergSnapshotProvider(
+        list(cfg.symbols), cfg.start, cfg.end,
+        cache_dir=cfg.data.cache_dir, benchmark_symbol=cfg.data.benchmark or "SPX",
+    )
+
+
 PROVIDERS: dict[str, Callable[[RunConfig], DataProvider]] = {
     "yfinance": _yfinance_provider,
     "stooq": _stooq_provider,
+    "bloomberg": _bloomberg_provider,
 }
 
 
