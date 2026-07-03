@@ -224,7 +224,7 @@ def test_build_strategy_rejects_bad_spec(strategy, params, match):
 
 def test_unknown_data_source_rejected():
     d = minimal_dict()
-    d["data"] = {"source": "bloomberg"}
+    d["data"] = {"source": "unknownsource"}
     cfg = config_from_dict(d)
     with pytest.raises(ValueError, match="unknown data source"):
         run_from_config(cfg)
@@ -253,3 +253,49 @@ def test_same_config_same_data_same_result():
     pd.testing.assert_series_equal(a.equity_curve, b.equity_curve)
     assert a.trades == b.trades
     assert a.metrics == b.metrics
+
+
+# ---- universe.file support -----------------------------------------------------------
+
+def test_universe_file_loads_symbols(tmp_path):
+    (tmp_path / "u.txt").write_text("# generated\nAAA\n\nBBB\n")
+    d = minimal_dict()
+    d["universe"] = {"file": "u.txt"}
+    cfg = config_from_dict(d, base_dir=tmp_path)
+    assert cfg.symbols == ("AAA", "BBB")
+
+
+def test_universe_requires_exactly_one_of_symbols_or_file(tmp_path):
+    d = minimal_dict()
+    d["universe"] = {}
+    with pytest.raises(ConfigError):
+        config_from_dict(d, base_dir=tmp_path)
+    d["universe"] = {"symbols": ["AAA"], "file": "u.txt"}
+    with pytest.raises(ConfigError):
+        config_from_dict(d, base_dir=tmp_path)
+
+
+def test_universe_file_missing_or_empty_fails_loudly(tmp_path):
+    d = minimal_dict()
+    d["universe"] = {"file": "absent.txt"}
+    with pytest.raises(ConfigError):
+        config_from_dict(d, base_dir=tmp_path)
+    (tmp_path / "empty.txt").write_text("# only comments\n")
+    d["universe"] = {"file": "empty.txt"}
+    with pytest.raises(ConfigError):
+        config_from_dict(d, base_dir=tmp_path)
+
+
+def test_universe_file_empty_string_fails_loudly_as_config_error(tmp_path):
+    d = minimal_dict()
+    d["universe"] = {"file": ""}
+    with pytest.raises(ConfigError, match="non-empty path"):
+        config_from_dict(d, base_dir=tmp_path)
+    d["universe"] = {"file": "   "}
+    with pytest.raises(ConfigError, match="non-empty path"):
+        config_from_dict(d, base_dir=tmp_path)
+
+
+def test_bloomberg_provider_registered():
+    from btf.config.builder import PROVIDERS
+    assert "bloomberg" in PROVIDERS

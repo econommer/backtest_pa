@@ -12,6 +12,7 @@ dependencies = ["pandas>=2.0", "numpy>=1.24", "pyyaml>=6.0"]
 [project.optional-dependencies]
 # Phase-1 free market-data adapters (yfinance primary; Stooq fallback uses pandas).
 data = ["yfinance>=0.2", "pyarrow>=15"]
+bloomberg = ["blpapi"]
 dev = ["pytest>=8.0", "mypy>=1.8", "ruff>=0.4", "yfinance>=0.2", "pyarrow>=15", "types-PyYAML"]
 
 [tool.hatch.build.targets.wheel]
@@ -31,4 +32,8 @@ files = ["src"]
 
 [[tool.mypy.overrides]]
 module = ["pandas.*", "yfinance.*", "pyarrow.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "blpapi"
 ignore_missing_imports = true

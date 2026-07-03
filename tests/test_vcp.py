@@ -151,7 +151,7 @@ def _ctx(store, as_of, positions=None, universe=None):
         equity=100_000.0,
         positions=positions or {},
         market=MarketContext(as_of=as_of, regime=Regime.BULL),
-        universe=universe or list(store.keys()),
+        universe=list(store.keys()) if universe is None else universe,
     )
 
 
@@ -200,6 +200,27 @@ def test_vcp_exits_below_trail_ma():
         )
     }
     signals = VcpStrategy(trail_ma=50).on_bar(_ctx({"AAA": df}, as_of, positions=pos))
+    exits = [s for s in signals if s.kind is SignalKind.EXIT]
+    assert len(exits) == 1 and exits[0].symbol == "AAA"
+
+
+def test_vcp_exit_still_evaluated_when_symbol_leaves_universe():
+    """PIT universe (M6): a held stock removed from ctx.universe must still be managed."""
+    # Same arrangement as test_vcp_exits_below_trail_ma, but the held symbol
+    # has been deleted from the universe (simulating an index removal) while
+    # the position is still open. Only ctx.positions still references it.
+    closes = [100 + i * 0.3 for i in range(80)] + [90.0]  # last bar dumps below SMA50
+    df = _frame(closes)
+    as_of = df.index[-1].date()
+    pos = {
+        "AAA": Position(
+            symbol="AAA", direction=Direction.LONG, quantity=10, avg_price=100.0,
+            stop_price=80.0, entry_ts=df.index[0].date(), risk_per_share=20.0,
+        )
+    }
+    signals = VcpStrategy(trail_ma=50).on_bar(
+        _ctx({"AAA": df}, as_of, positions=pos, universe=[])
+    )
     exits = [s for s in signals if s.kind is SignalKind.EXIT]
     assert len(exits) == 1 and exits[0].symbol == "AAA"
 

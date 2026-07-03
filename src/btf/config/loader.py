@@ -32,10 +32,10 @@ def load_config(path: str | Path) -> RunConfig:
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, Mapping):
         raise ConfigError(f"{path}: top level must be a mapping, got {type(raw).__name__}")
-    return config_from_dict(raw)
+    return config_from_dict(raw, base_dir=Path(path).parent)
 
 
-def config_from_dict(d: Mapping[str, Any]) -> RunConfig:
+def config_from_dict(d: Mapping[str, Any], base_dir: str | Path | None = None) -> RunConfig:
     """Build a ``RunConfig`` from a plain mapping (the YAML document shape)."""
     _reject_unknown(d, {"name", "period", "universe", "data", "costs", "risk",
                         "strategy", "validation"}, where="top level")
@@ -49,10 +49,8 @@ def config_from_dict(d: Mapping[str, Any]) -> RunConfig:
         raise ConfigError(f"period.end ({end}) must be after period.start ({start})")
 
     universe = _require(d, "universe", Mapping)
-    _reject_unknown(universe, {"symbols"}, where="universe")
-    symbols = _require(universe, "symbols", list)
-    if not symbols or not all(isinstance(s, str) for s in symbols):
-        raise ConfigError("universe.symbols must be a non-empty list of strings")
+    _reject_unknown(universe, {"symbols", "file"}, where="universe")
+    symbols = _universe_symbols(universe, base_dir)
 
     strategy_raw = _require(d, "strategy", Mapping)
     _reject_unknown(strategy_raw, {"name", "params"}, where="strategy")
@@ -72,6 +70,37 @@ def config_from_dict(d: Mapping[str, Any]) -> RunConfig:
         risk=_section(d.get("risk"), RiskConfig, "risk"),
         validation=_validation_config(d.get("validation"), start, end),
     )
+
+
+def _universe_symbols(universe: Mapping[str, Any], base_dir: str | Path | None) -> list[str]:
+    """Exactly one of ``symbols`` (inline) or ``file`` (one symbol per line)."""
+    has_symbols = universe.get("symbols") is not None
+    has_file = universe.get("file") is not None
+    if has_symbols == has_file:
+        raise ConfigError("universe: provide exactly one of 'symbols' or 'file'")
+    if has_symbols:
+        symbols = universe["symbols"]
+        if not isinstance(symbols, list) or not symbols or not all(
+            isinstance(s, str) for s in symbols
+        ):
+            raise ConfigError("universe.symbols must be a non-empty list of strings")
+        return list(symbols)
+    file_value = universe["file"]
+    if not isinstance(file_value, str) or not file_value.strip():
+        raise ConfigError("universe.file must be a non-empty path")
+    fpath = Path(file_value)
+    if not fpath.is_absolute() and base_dir is not None:
+        fpath = Path(base_dir) / fpath
+    if not fpath.exists():
+        raise ConfigError(f"universe.file not found: {fpath}")
+    symbols = [
+        ln.strip()
+        for ln in fpath.read_text().splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
+    if not symbols:
+        raise ConfigError(f"universe.file has no symbols: {fpath}")
+    return symbols
 
 
 # ---- section parsers ---------------------------------------------------------

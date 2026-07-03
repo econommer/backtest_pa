@@ -187,7 +187,11 @@ class VcpStrategy:
     def on_bar(self, ctx: Context) -> list[Signal]:
         signals: list[Signal] = []
         rs = self._rs_percentiles(ctx)
-        for sym in ctx.universe:
+        universe = list(ctx.universe)
+        # PIT universe (M6): a held stock may have left the index — keep
+        # managing its exit; only NEW entries are restricted to members.
+        held_outside = [s for s in ctx.positions if s not in set(universe)]
+        for sym in [*universe, *held_outside]:
             df = ctx.history(sym)
             if len(df) == 0:
                 continue

@@ -80,8 +80,30 @@ class BasicEngine:
             for fill in broker.sweep_stops(portfolio.snapshot_positions(), bars_t):
                 portfolio.apply_exit(fill)
 
-            # 4. Mark-to-market at today's close and record equity.
+            # 3b. Delisting cash-out: a held symbol with no bar today AND no bars
+            # remaining in the store ever again has left the exchange (acquisition,
+            # bankruptcy, index removal with the data feed dropped). Real-world
+            # holders are cashed out at the final print — synthesize that exit here
+            # via the same apply_exit mechanism _force_liquidate uses, rather than
+            # leaving the lot locked until end-of-run (survivorship-free PIT data,
+            # M6 fix). A held symbol with a bar today is unaffected.
+            for sym in portfolio.open_symbols():
+                if sym in bars_t:
+                    continue
+                if self._has_future_bars(store, sym, t):
+                    continue  # temporary gap, not a delisting
+                self._delist_exit(portfolio, store, sym, t)
+
+            # 4. Mark-to-market at today's close and record equity. A held symbol
+            # missing today's bar (temporary gap, or delisted just above) still needs
+            # a value — fall back to its last available close <= t so equity never
+            # phantom-drops to cash-only for one day (M6 fix).
             closes = {sym: bar.close for sym, bar in bars_t.items()}
+            for sym in portfolio.open_symbols():
+                if sym not in closes:
+                    fallback = self._last_close_on_or_before(store, sym, t)
+                    if fallback is not None:
+                        closes[sym] = fallback
             equity = portfolio.mark(closes)
             portfolio.record_equity(t, equity)
 
@@ -188,6 +210,54 @@ class BasicEngine:
                 volume=float(row["volume"]),
             )
         return bars
+
+    @staticmethod
+    def _has_future_bars(store: Mapping[str, pd.DataFrame], sym: str, t: date) -> bool:
+        """Whether ``sym`` has any bar strictly after ``t`` in the store (still trading)."""
+        df = store.get(sym)
+        if df is None:
+            return False
+        return bool((df.index > pd.Timestamp(t)).any())
+
+    @staticmethod
+    def _last_close_on_or_before(
+        store: Mapping[str, pd.DataFrame], sym: str, t: date
+    ) -> float | None:
+        df = store.get(sym)
+        if df is None:
+            return None
+        hist = df.loc[: pd.Timestamp(t)]
+        if hist.empty:
+            return None
+        return float(hist["close"].iloc[-1])
+
+    @staticmethod
+    def _delist_exit(
+        portfolio: Portfolio, store: Mapping[str, pd.DataFrame], sym: str, t: date
+    ) -> None:
+        """Synthesize an exit at ``sym``'s last available close (delisting cash-out)."""
+        from btf.core import Direction, Fill
+
+        df = store.get(sym)
+        if df is None:
+            return
+        hist = df.loc[: pd.Timestamp(t)]
+        if hist.empty:
+            return
+        last_ts = hist.index[-1].date()
+        close = float(hist["close"].iloc[-1])
+        pos = portfolio.snapshot_positions()[sym]
+        portfolio.apply_exit(
+            Fill(
+                symbol=sym,
+                ts=last_ts,
+                price=close,
+                quantity=pos.quantity,
+                direction=Direction.LONG,
+                kind=FillKind.EXIT,
+                reason="delisted",
+            )
+        )
 
     @staticmethod
     def _force_liquidate(portfolio: Portfolio, store: Mapping[str, pd.DataFrame], t: date) -> None:
