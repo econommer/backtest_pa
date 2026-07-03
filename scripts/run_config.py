@@ -69,9 +69,17 @@ def main() -> int:
         if not ran_any:
             print("\n--validate given, but the config has no validation section.")
 
-    print("\n[!] SELECTION / SURVIVORSHIP BIAS (Phase-1): hand-picked, currently-listed "
-          "symbols; no delisted names. Expectancy is upward-biased until M6's "
-          "survivorship-free data. See BACKTESTING_PLAN.md §6.")
+    if cfg.data.source == "bloomberg":
+        missing = sorted(getattr(provider, "missing_symbols", []))
+        print("\nData: Bloomberg snapshot — survivorship-free PIT S&P 500 universe "
+              "(monthly membership granularity; see M6 spec).")
+        if missing:
+            head = ", ".join(missing[:15]) + (" ..." if len(missing) > 15 else "")
+            print(f"[!] coverage: {len(missing)} member(s) without cached bars: {head}")
+    else:
+        print("\n[!] SELECTION / SURVIVORSHIP BIAS (Phase-1): hand-picked, currently-listed "
+              "symbols; no delisted names. Expectancy is upward-biased until M6's "
+              "survivorship-free data. See BACKTESTING_PLAN.md §6.")
     return 0
 
 
