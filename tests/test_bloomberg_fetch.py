@@ -1,20 +1,28 @@
 """Stage-1 membership fetch: PIT monthly snapshots -> parquet + universe file."""
+import json
 from datetime import date
 
 import pandas as pd
 import pytest
 
+from btf.data._cache import cache_path, read_cache
 from btf.data.bloomberg.fetch import (
+    BENCHMARK_SYMBOL,
+    FAILURES_FILENAME,
+    INDEX_SECURITY,
     MEMBERSHIP_FILENAME,
     bloomberg_dir,
+    fetch_bars,
+    fetch_benchmark,
     fetch_membership,
     member_symbol,
     month_ends,
+    plan_bars,
     security_for,
     write_universe_file,
 )
 from btf.data.bloomberg.ledger import LedgerError, UsageLedger
-from tests.bloomberg_fixtures import FakeSession
+from tests.bloomberg_fixtures import FakeSession, raw_bars
 
 TODAY = date(2026, 7, 2)
 
@@ -86,3 +94,77 @@ def test_write_universe_file_sorted_unique(tmp_path):
     assert symbols == ["AAA", "BBB"]
     lines = [ln for ln in out.read_text().splitlines() if ln and not ln.startswith("#")]
     assert lines == ["AAA", "BBB"]
+
+
+START, END = date(2020, 1, 15), date(2020, 3, 10)
+TODAY = date(2026, 7, 2)
+
+
+def _seeded(tmp_path, symbols):
+    """Membership parquet on disk for `symbols`, all in one snapshot month."""
+    m = pd.DataFrame(
+        {"snapshot": [pd.Timestamp("2020-01-31")] * len(symbols), "symbol": symbols}
+    )
+    bdir = bloomberg_dir(tmp_path)
+    bdir.mkdir(parents=True, exist_ok=True)
+    m.to_parquet(bdir / MEMBERSHIP_FILENAME)
+    return UsageLedger.load(tmp_path / "ledger.json")
+
+
+def test_plan_bars_reports_counts_without_a_session(tmp_path):
+    ledger = _seeded(tmp_path, ["AAA", "BBB", "CCC"])
+    plan = plan_bars(ledger, tmp_path, START, END, on=TODAY, max_new_per_day=2)
+    assert (plan.members, plan.cached, plan.failed, plan.todo) == (3, 0, 0, 3)
+    assert plan.allowed_today == 2  # capped by the daily budget
+
+
+def test_fetch_bars_writes_normalized_cache_and_records_ledger(tmp_path):
+    ledger = _seeded(tmp_path, ["AAA", "BBB"])
+    session = FakeSession(bars={
+        "AAA US Equity": raw_bars("2020-01-15", 30, seed=1),
+        "BBB US Equity": raw_bars("2020-01-15", 30, seed=2),
+    })
+    res = fetch_bars(session, ledger, tmp_path, START, END, on=TODAY)
+    assert sorted(res.fetched) == ["AAA", "BBB"] and not res.failed
+    cached = read_cache(cache_path(tmp_path, "bloomberg", "AAA", START, END, True))
+    assert list(cached.columns) == ["open", "high", "low", "close", "volume"]
+    assert ledger.known_count == 2
+
+
+def test_fetch_bars_hard_stops_before_exceeding_daily_budget(tmp_path):
+    ledger = _seeded(tmp_path, ["AAA", "BBB", "CCC"])
+    session = FakeSession(bars={
+        f"{s} US Equity": raw_bars("2020-01-15", 30) for s in ("AAA", "BBB", "CCC")
+    })
+    res = fetch_bars(
+        session, ledger, tmp_path, START, END, on=TODAY, max_new_per_day=2
+    )
+    assert len(res.fetched) == 2 and res.budget_stopped and res.remaining == 1
+    assert ledger.new_on(TODAY) == 2  # never exceeded
+    # Next day: budget resets, the remainder completes.
+    res2 = fetch_bars(
+        session, ledger, tmp_path, START, END, on=date(2026, 7, 3), max_new_per_day=2
+    )
+    assert res2.fetched == ["CCC"] and not res2.budget_stopped
+
+
+def test_fetch_bars_resumes_skipping_cached_and_failed(tmp_path):
+    ledger = _seeded(tmp_path, ["AAA", "GONE"])
+    session = FakeSession(bars={"AAA US Equity": raw_bars("2020-01-15", 30)})
+    res = fetch_bars(session, ledger, tmp_path, START, END, on=TODAY)
+    assert res.fetched == ["AAA"] and res.failed == {"GONE": "no data"}
+    failures = json.loads((bloomberg_dir(tmp_path) / FAILURES_FILENAME).read_text())
+    assert "GONE" in failures
+    # Re-run: nothing to do — cached + failed both skipped, no new session calls.
+    calls_before = len(session.calls)
+    res2 = fetch_bars(session, ledger, tmp_path, START, END, on=TODAY)
+    assert res2.fetched == [] and res2.remaining == 0
+    assert len(session.calls) == calls_before
+
+
+def test_fetch_benchmark_caches_spx_bars(tmp_path):
+    ledger = UsageLedger.load(tmp_path / "ledger.json")
+    session = FakeSession(bars={INDEX_SECURITY: raw_bars("2020-01-15", 30)})
+    fetch_benchmark(session, ledger, tmp_path, START, END, on=TODAY)
+    cached = read_cache(cache_path(tmp_path, "bloomberg", BENCHMARK_SYMBOL, START, END, True))
+    assert cached is not None and not cached.empty

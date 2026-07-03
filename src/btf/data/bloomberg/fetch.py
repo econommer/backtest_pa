@@ -11,11 +11,15 @@ assume Bloomberg metered the attempt).
 from __future__ import annotations
 
 import calendar
+import json
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
+from btf.data._cache import cache_path, write_cache
+from btf.data._normalize import normalize_ohlcv
 from btf.data.bloomberg.ledger import LedgerError, UsageLedger
 from btf.data.bloomberg.session import SessionLike
 
@@ -88,3 +92,150 @@ def write_universe_file(membership: pd.DataFrame, path: str | Path) -> list[str]
     )
     p.write_text(header + "\n".join(symbols) + "\n")
     return symbols
+
+
+# --- stage 2: daily bars (budget-gated, resumable) ---------------------------
+
+FAILURES_FILENAME = "fetch_failures.json"
+
+
+def _load_failures(bdir: Path) -> dict[str, str]:
+    p = bdir / FAILURES_FILENAME
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+def _save_failures(bdir: Path, failures: dict[str, str]) -> None:
+    (bdir / FAILURES_FILENAME).write_text(json.dumps(failures, indent=2, sort_keys=True))
+
+
+def _member_symbols(cache_dir: str | Path) -> list[str]:
+    m = pd.read_parquet(bloomberg_dir(cache_dir) / MEMBERSHIP_FILENAME)
+    return sorted(set(m["symbol"]))
+
+
+def _todo_symbols(
+    cache_dir: str | Path, start: date, end: date, failures: dict[str, str]
+) -> tuple[list[str], int]:
+    """(uncached+unfailed symbols, cached count) for the snapshot window."""
+    symbols = _member_symbols(cache_dir)
+    cached = [
+        s for s in symbols if cache_path(cache_dir, "bloomberg", s, start, end, True).exists()
+    ]
+    todo = [s for s in symbols if s not in set(cached) and s not in failures]
+    return todo, len(cached)
+
+
+@dataclass(frozen=True)
+class BarsPlan:
+    """Dry-run consumption estimate (spec D5) — computed with zero API calls."""
+
+    members: int
+    cached: int
+    failed: int
+    todo: int
+    allowed_today: int
+
+
+def plan_bars(
+    ledger: UsageLedger,
+    cache_dir: str | Path,
+    start: date,
+    end: date,
+    *,
+    on: date,
+    max_new_per_day: int = 300,
+) -> BarsPlan:
+    failures = _load_failures(bloomberg_dir(cache_dir))
+    todo, cached = _todo_symbols(cache_dir, start, end, failures)
+    return BarsPlan(
+        members=len(_member_symbols(cache_dir)),
+        cached=cached,
+        failed=len(failures),
+        todo=len(todo),
+        allowed_today=min(len(todo), ledger.allowance(on, max_new_per_day)),
+    )
+
+
+@dataclass
+class BarsResult:
+    fetched: list[str]
+    failed: dict[str, str]
+    budget_stopped: bool
+    remaining: int
+
+
+def fetch_bars(
+    session: SessionLike,
+    ledger: UsageLedger,
+    cache_dir: str | Path,
+    start: date,
+    end: date,
+    *,
+    on: date,
+    max_new_per_day: int = 300,
+    batch_size: int = 50,
+) -> BarsResult:
+    """Fetch uncached member bars, hard-stopping BEFORE the daily budget is hit."""
+    bdir = bloomberg_dir(cache_dir)
+    failures = _load_failures(bdir)
+    todo, _ = _todo_symbols(cache_dir, start, end, failures)
+    fetched: list[str] = []
+    new_failed: dict[str, str] = {}
+    budget_stopped = False
+    i = 0
+    while i < len(todo):
+        batch = todo[i : i + batch_size]
+        secs = [security_for(s) for s in batch]
+        # Budget gate BEFORE the request: trim to today's remaining allowance.
+        allowance = ledger.allowance(on, max_new_per_day)
+        n_new = len(ledger.new_securities(secs))
+        if n_new > allowance:
+            keep = 0
+            new_seen = 0
+            for s in secs:  # keep the longest prefix that fits the allowance
+                new_seen += 1 if ledger.new_securities([s]) else 0
+                if new_seen > allowance:
+                    break
+                keep += 1
+            batch, secs = batch[:keep], secs[:keep]
+            budget_stopped = True
+            if not batch:
+                break
+        ledger.record(secs, on)  # count first — a failed request still counted
+        frames = session.daily_bars(secs, start, end)
+        for sym, sec in zip(batch, secs):
+            raw = frames.get(sec)
+            if raw is None or len(raw) == 0:
+                new_failed[sym] = "no data"
+                continue
+            frame = normalize_ohlcv(raw)
+            write_cache(cache_path(cache_dir, "bloomberg", sym, start, end, True), frame)
+            fetched.append(sym)
+        if budget_stopped:
+            break
+        i += batch_size
+    if new_failed:
+        _save_failures(bdir, {**failures, **new_failed})
+    remaining = len(todo) - len(fetched) - len(new_failed)
+    return BarsResult(fetched, new_failed, budget_stopped, remaining)
+
+
+def fetch_benchmark(
+    session: SessionLike,
+    ledger: UsageLedger,
+    cache_dir: str | Path,
+    start: date,
+    end: date,
+    *,
+    on: date,
+) -> None:
+    """Cache SPX index daily bars under the framework symbol ``"SPX"``."""
+    path = cache_path(cache_dir, "bloomberg", BENCHMARK_SYMBOL, start, end, True)
+    if path.exists():
+        return
+    ledger.record([INDEX_SECURITY], on)  # no-op on unique count if stage 1 ran
+    frames = session.daily_bars([INDEX_SECURITY], start, end)
+    raw = frames.get(INDEX_SECURITY)
+    if raw is None or len(raw) == 0:
+        raise LedgerError(f"no bars returned for {INDEX_SECURITY}")
+    write_cache(path, normalize_ohlcv(raw))
