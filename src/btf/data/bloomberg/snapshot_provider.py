@@ -43,7 +43,6 @@ class BloombergSnapshotProvider:
         benchmark_symbol: str = "SPX",
         strict: bool = False,
     ) -> None:
-        self.start, self.end = start, end
         mpath = bloomberg_dir(cache_dir) / MEMBERSHIP_FILENAME
         if not mpath.exists():
             raise SnapshotError(
@@ -69,6 +68,16 @@ class BloombergSnapshotProvider:
                 f"{len(missing)} symbol(s) missing cached bars "
                 f"(e.g. {missing[:5]})\n" + _FETCH_HINT.format(stage="bars")
             )
+        # A 100% miss is never a genuine coverage gap — it means the (start, end)
+        # used here doesn't match what was fetched (a cache-key mismatch), so fail
+        # loudly even when strict=False rather than silently returning an empty book.
+        if symbols and missing and len(missing) == len(symbols):
+            raise SnapshotError(
+                f"all {len(symbols)} requested symbol(s) have no cached bars for "
+                f"({start}, {end}) — likely a start/end mismatch with the fetched "
+                f"snapshot window, not a coverage gap\n"
+                + _FETCH_HINT.format(stage="bars")
+            )
         #: Symbols requested but not on disk — surfaced as coverage stats (D10).
         self.missing_symbols: list[str] = missing
 
@@ -76,8 +85,12 @@ class BloombergSnapshotProvider:
         bframe = read_cache(
             cache_path(cache_dir, "bloomberg", benchmark_symbol, start, end, True)
         )
-        if bframe is not None and not bframe.empty:
-            benchmark = bframe["close"].rename(benchmark_symbol)
+        if bframe is None or bframe.empty:
+            raise SnapshotError(
+                f"benchmark {benchmark_symbol!r} has no cached bars for ({start}, {end})\n"
+                + _FETCH_HINT.format(stage="membership")
+            )
+        benchmark = bframe["close"].rename(benchmark_symbol)
         self._inner = InMemoryDataProvider(
             bars, universe_symbols=list(symbols), benchmark=benchmark
         )

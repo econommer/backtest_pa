@@ -74,3 +74,44 @@ def test_missing_bars_collected_not_fetched(tmp_path):
 def test_missing_membership_parquet_raises_with_fetch_command(tmp_path):
     with pytest.raises(SnapshotError, match="fetch_bloomberg_snapshot"):
         BloombergSnapshotProvider(["AAA"], START, END, cache_dir=tmp_path)
+
+
+def test_all_symbols_missing_bars_raises_even_without_strict(tmp_path):
+    # Membership snapshot exists, but NONE of the requested symbols' bars are cached
+    # (e.g. a start/end cache-key mismatch) — this should never pass silently, even
+    # with strict=False, because a genuine coverage gap never hits 100% miss.
+    _snapshot(tmp_path, MEMBERSHIP, [])  # no bar files written for any symbol
+    with pytest.raises(SnapshotError, match="fetch_bloomberg_snapshot") as exc_info:
+        BloombergSnapshotProvider(["AAA", "BBB", "CCC"], START, END, cache_dir=tmp_path)
+    msg = str(exc_info.value)
+    assert str(START) in msg and str(END) in msg
+
+
+def test_missing_benchmark_raises_snapshot_error_with_fetch_hint(tmp_path):
+    # Membership + all symbol bars present, but the benchmark's own cache file is absent.
+    _snapshot(tmp_path, MEMBERSHIP, ["AAA", "BBB", "CCC"])  # no SPX bars written
+    with pytest.raises(SnapshotError, match="fetch_bloomberg_snapshot") as exc_info:
+        BloombergSnapshotProvider(
+            ["AAA", "BBB", "CCC"], START, END, cache_dir=tmp_path, benchmark_symbol="SPX"
+        )
+    assert "SPX" in str(exc_info.value)
+
+
+def test_universe_on_exact_snapshot_date_returns_that_snapshots_members(tmp_path):
+    _snapshot(tmp_path, MEMBERSHIP, ["AAA", "BBB", "CCC", "SPX"])
+    p = BloombergSnapshotProvider(["AAA", "BBB", "CCC"], START, END, cache_dir=tmp_path)
+    # Evaluated exactly ON the 2020-01-31 snapshot date (not before, not after).
+    assert sorted(p.universe(date(2020, 1, 31))) == ["AAA", "BBB"]
+    assert sorted(p.universe(date(2020, 2, 29))) == ["AAA", "CCC"]
+
+
+def test_empty_membership_parquet_constructs_with_empty_universe(tmp_path):
+    bdir = bloomberg_dir(tmp_path)
+    bdir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(columns=["snapshot", "symbol"]).to_parquet(bdir / MEMBERSHIP_FILENAME)
+    for sym in ("AAA", "SPX"):
+        frame = normalize_ohlcv(raw_bars("2020-01-15", 30, seed=0))
+        write_cache(cache_path(tmp_path, "bloomberg", sym, START, END, True), frame)
+    p = BloombergSnapshotProvider(["AAA"], START, END, cache_dir=tmp_path)
+    assert p.universe(date(2020, 2, 1)) == []
+    assert p.universe(date(2020, 1, 1)) == []
