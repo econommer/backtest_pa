@@ -24,8 +24,6 @@ from btf.data.bloomberg.fetch import (
 from btf.data.bloomberg.ledger import LedgerError, UsageLedger
 from tests.bloomberg_fixtures import FakeSession, raw_bars
 
-TODAY = date(2026, 7, 2)
-
 
 def test_month_ends_spans_inclusive_calendar_months():
     ends = month_ends(date(2020, 1, 15), date(2020, 4, 10))
@@ -160,6 +158,41 @@ def test_fetch_bars_resumes_skipping_cached_and_failed(tmp_path):
     res2 = fetch_bars(session, ledger, tmp_path, START, END, on=TODAY)
     assert res2.fetched == [] and res2.remaining == 0
     assert len(session.calls) == calls_before
+
+
+def test_fetch_bars_zero_allowance_makes_no_session_calls(tmp_path):
+    """Budget already exhausted: no session call should occur."""
+    ledger = _seeded(tmp_path, ["X", "Y"])
+    # Pre-exhaust the budget by recording OTHER securities (not in the fetch set).
+    ledger.record(["OTHER1 US Equity", "OTHER2 US Equity"], on=TODAY)
+    session = FakeSession(bars={
+        "X US Equity": raw_bars("2020-01-15", 30),
+        "Y US Equity": raw_bars("2020-01-15", 30),
+    })
+    res = fetch_bars(session, ledger, tmp_path, START, END, on=TODAY, max_new_per_day=2)
+    # No fetches, budget stopped, remaining == 2 (both still to-do).
+    assert res.fetched == [] and res.budget_stopped and res.remaining == 2
+    # Verify no ("bars", ...) entry in session.calls — budget check prevented any request.
+    bar_calls = [c for c in session.calls if c[0] == "bars"]
+    assert bar_calls == []
+
+
+def test_fetch_bars_budget_exhausted_across_batches(tmp_path):
+    """Budget exhausted between batch 1 and batch 3: exactly 2 fetched, batch 3 stopped."""
+    ledger = _seeded(tmp_path, ["X", "Y", "Z"])
+    session = FakeSession(bars={
+        "X US Equity": raw_bars("2020-01-15", 30),
+        "Y US Equity": raw_bars("2020-01-15", 30),
+        "Z US Equity": raw_bars("2020-01-15", 30),
+    })
+    # max_new_per_day=2, batch_size=1 => batch 1 (X), batch 2 (Y) succeed; batch 3 (Z) stopped.
+    res = fetch_bars(
+        session, ledger, tmp_path, START, END, on=TODAY, max_new_per_day=2, batch_size=1
+    )
+    assert sorted(res.fetched) == ["X", "Y"]
+    assert res.budget_stopped and res.remaining == 1
+    # Cap never exceeded: ledger must show exactly 2 new on TODAY.
+    assert ledger.new_on(TODAY) == 2
 
 
 def test_fetch_benchmark_caches_spx_bars(tmp_path):
