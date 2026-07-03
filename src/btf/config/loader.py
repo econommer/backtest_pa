@@ -85,7 +85,10 @@ def _universe_symbols(universe: Mapping[str, Any], base_dir: str | Path | None) 
         ):
             raise ConfigError("universe.symbols must be a non-empty list of strings")
         return list(symbols)
-    fpath = Path(universe["file"])
+    file_value = universe["file"]
+    if not isinstance(file_value, str) or not file_value.strip():
+        raise ConfigError("universe.file must be a non-empty path")
+    fpath = Path(file_value)
     if not fpath.is_absolute() and base_dir is not None:
         fpath = Path(base_dir) / fpath
     if not fpath.exists():

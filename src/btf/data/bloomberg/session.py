@@ -135,6 +135,12 @@ class BlpSession:
             ):
                 for msg in event:
                     if msg.hasElement("responseError"):
+                        # A request-level responseError (e.g. Bloomberg's "DAILY LIMIT
+                        # REACHED") aborts the WHOLE batch here, after the ledger has
+                        # already counted it — conservative by design (spec: a failed
+                        # request still counted, assume Bloomberg metered the attempt).
+                        # A resumed fetch_bars run skips already-cached symbols, so the
+                        # batch's uncached members are simply retried next time.
                         raise BloombergError(str(msg.getElement("responseError")))
                     yield msg
             if event.eventType() == self._blpapi.Event.RESPONSE:

@@ -286,6 +286,16 @@ def test_universe_file_missing_or_empty_fails_loudly(tmp_path):
         config_from_dict(d, base_dir=tmp_path)
 
 
+def test_universe_file_empty_string_fails_loudly_as_config_error(tmp_path):
+    d = minimal_dict()
+    d["universe"] = {"file": ""}
+    with pytest.raises(ConfigError, match="non-empty path"):
+        config_from_dict(d, base_dir=tmp_path)
+    d["universe"] = {"file": "   "}
+    with pytest.raises(ConfigError, match="non-empty path"):
+        config_from_dict(d, base_dir=tmp_path)
+
+
 def test_bloomberg_provider_registered():
     from btf.config.builder import PROVIDERS
     assert "bloomberg" in PROVIDERS
