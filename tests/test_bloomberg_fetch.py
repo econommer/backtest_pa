@@ -22,6 +22,7 @@ from btf.data.bloomberg.fetch import (
     write_universe_file,
 )
 from btf.data.bloomberg.ledger import LedgerError, UsageLedger
+from btf.data.bloomberg.session import BloombergError
 from tests.bloomberg_fixtures import FakeSession, raw_bars
 
 
@@ -201,3 +202,48 @@ def test_fetch_benchmark_caches_spx_bars(tmp_path):
     fetch_benchmark(session, ledger, tmp_path, START, END, on=TODAY)
     cached = read_cache(cache_path(tmp_path, "bloomberg", BENCHMARK_SYMBOL, START, END, True))
     assert cached is not None and not cached.empty
+
+
+def test_fetch_benchmark_raises_bloomberg_error_when_no_bars_returned(tmp_path):
+    """No bars for SPX Index is a session/data problem, not a ledger problem."""
+    ledger = UsageLedger.load(tmp_path / "ledger.json")
+    session = FakeSession(bars={})  # INDEX_SECURITY absent -> no data
+    with pytest.raises(BloombergError, match=INDEX_SECURITY):
+        fetch_benchmark(session, ledger, tmp_path, START, END, on=TODAY)
+
+
+def test_fetch_membership_twice_without_overwrite_raises_and_makes_no_session_calls(tmp_path):
+    session = FakeSession(
+        members_by_month={
+            date(2020, 1, 31): ["AAA UW", "BBB UN"],
+            date(2020, 2, 29): ["AAA UW", "CCC UN"],
+        }
+    )
+    ledger = UsageLedger.load(tmp_path / "ledger.json")
+    fetch_membership(session, ledger, tmp_path, date(2020, 1, 15), date(2020, 3, 10), on=TODAY)
+    calls_before = len(session.calls)
+
+    with pytest.raises(LedgerError, match="already fetched"):
+        fetch_membership(
+            session, ledger, tmp_path, date(2020, 1, 15), date(2020, 3, 10), on=TODAY
+        )
+    assert len(session.calls) == calls_before  # zero new session calls
+
+
+def test_fetch_membership_overwrite_true_refetches(tmp_path):
+    session = FakeSession(
+        members_by_month={
+            date(2020, 1, 31): ["AAA UW", "BBB UN"],
+            date(2020, 2, 29): ["AAA UW", "CCC UN"],
+        }
+    )
+    ledger = UsageLedger.load(tmp_path / "ledger.json")
+    fetch_membership(session, ledger, tmp_path, date(2020, 1, 15), date(2020, 3, 10), on=TODAY)
+    calls_before = len(session.calls)
+
+    m = fetch_membership(
+        session, ledger, tmp_path, date(2020, 1, 15), date(2020, 3, 10), on=TODAY,
+        overwrite=True,
+    )
+    assert len(session.calls) > calls_before
+    assert sorted(m[m["snapshot"] == pd.Timestamp("2020-01-31")]["symbol"]) == ["AAA", "BBB"]

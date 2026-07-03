@@ -28,6 +28,9 @@ def main() -> int:
     parser.add_argument("--stage", choices=["membership", "bars"], required=True)
     parser.add_argument("--confirm", action="store_true",
                         help="actually fetch (default: dry-run plan only)")
+    parser.add_argument("--refresh", action="store_true",
+                        help="stage=membership only: overwrite an existing membership "
+                             "snapshot (re-fires the full monthly-snapshot fetch)")
     parser.add_argument("--max-new-per-day", type=int, default=300)
     parser.add_argument("--cache-dir", default="data_cache")
     parser.add_argument("--start", type=date.fromisoformat, default=date(2010, 1, 1))
@@ -43,8 +46,12 @@ def main() -> int:
 
     if args.stage == "membership":
         months = fetch.month_ends(args.start, args.end)
+        mpath = fetch.bloomberg_dir(args.cache_dir) / fetch.MEMBERSHIP_FILENAME
         print(f"membership plan: {len(months)} monthly snapshots of {fetch.INDEX_SECURITY} "
               f"= 1 unique security, ~{len(months) + 1} requests (incl. SPX bars)")
+        if mpath.exists():
+            print(f"membership snapshot already exists: {mpath}"
+                  + (" (--refresh will overwrite)" if not args.refresh else " (will overwrite: --refresh set)"))
         if not args.confirm:
             print("dry-run only. Re-run with --confirm to fetch.")
             return 0
@@ -53,7 +60,8 @@ def main() -> int:
         try:
             m = fetch.fetch_membership(session, ledger, args.cache_dir,
                                        args.start, args.end, on=today,
-                                       max_new_per_day=args.max_new_per_day)
+                                       max_new_per_day=args.max_new_per_day,
+                                       overwrite=args.refresh)
             fetch.fetch_benchmark(session, ledger, args.cache_dir,
                                   args.start, args.end, on=today)
         finally:

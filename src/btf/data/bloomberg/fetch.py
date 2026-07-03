@@ -21,7 +21,7 @@ import pandas as pd
 from btf.data._cache import cache_path, write_cache
 from btf.data._normalize import normalize_ohlcv
 from btf.data.bloomberg.ledger import LedgerError, UsageLedger
-from btf.data.bloomberg.session import SessionLike
+from btf.data.bloomberg.session import BloombergError, SessionLike
 
 INDEX_SECURITY = "SPX Index"
 #: Framework symbol under which the benchmark's bars are cached.
@@ -64,8 +64,20 @@ def fetch_membership(
     *,
     on: date,
     max_new_per_day: int = 300,
+    overwrite: bool = False,
 ) -> pd.DataFrame:
-    """Monthly PIT membership snapshots -> DataFrame(snapshot, symbol) + parquet."""
+    """Monthly PIT membership snapshots -> DataFrame(snapshot, symbol) + parquet.
+
+    Guards against re-firing all ~192 monthly requests on a re-run: if the
+    membership parquet already exists and ``overwrite`` is False, raise instead
+    of hitting the session at all. Pass ``overwrite=True`` to force a refresh.
+    """
+    mpath = bloomberg_dir(cache_dir) / MEMBERSHIP_FILENAME
+    if mpath.exists() and not overwrite:
+        raise LedgerError(
+            f"membership already fetched: {mpath}\n"
+            "pass --refresh to overwrite (this re-fires the full monthly-snapshot fetch)"
+        )
     if ledger.new_securities([INDEX_SECURITY]) and ledger.allowance(on, max_new_per_day) < 1:
         raise LedgerError(f"daily budget exhausted ({max_new_per_day} new securities)")
     # Record before requesting (conservative: a crash mid-loop still counted).
@@ -237,5 +249,5 @@ def fetch_benchmark(
     frames = session.daily_bars([INDEX_SECURITY], start, end)
     raw = frames.get(INDEX_SECURITY)
     if raw is None or len(raw) == 0:
-        raise LedgerError(f"no bars returned for {INDEX_SECURITY}")
+        raise BloombergError(f"no bars returned for {INDEX_SECURITY}")
     write_cache(path, normalize_ohlcv(raw))
