@@ -75,6 +75,10 @@ class BacktestContext:
         # (see tests/test_backtest_context_history.py, which diffs both against
         # a verbatim copy of the pre-speed-up code across on-bar/gap dates,
         # short/long/zero lookbacks, and missing symbols).
+        if lookback is not None and lookback < 0:
+            # Old `.tail(negative)` silently meant "drop the first N rows" —
+            # never something a strategy wants from an as-of window.
+            raise ValueError(f"lookback must be non-negative, got {lookback}")
         end = df.index.searchsorted(self._as_of_ts, side="right")
         start = max(0, end - lookback) if lookback is not None else 0
         return df.iloc[start:end]

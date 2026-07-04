@@ -114,3 +114,10 @@ def test_history_lookback_zero_matches_reference() -> None:
     got = ctx.history("AAA", 0)
     want = _reference_history(df, as_of, 0)
     assert got.equals(want)
+
+
+def test_negative_lookback_rejected():
+    """Negative lookback was silent nonsense under .tail(); now it fails loudly."""
+    ctx = _ctx({"AAA": _frame(10)}, as_of=date(2020, 1, 10))
+    with pytest.raises(ValueError, match="non-negative"):
+        ctx.history("AAA", lookback=-3)
