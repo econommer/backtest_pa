@@ -9,9 +9,11 @@ Anti-look-ahead: a strategy decides on bar *t*'s close; its orders fill at bar
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Mapping, Sequence, cast
 
+import numpy as np
 import pandas as pd
 
 from btf.context.backtest_context import BacktestContext
@@ -25,6 +27,26 @@ from btf.portfolio.portfolio import Portfolio
 from btf.regime.classifier import RegimeClassifier, SmaRegimeClassifier
 from btf.risk.sizer import PositionSizer
 from btf.strategies.base import Strategy
+
+
+@dataclass(frozen=True, slots=True)
+class _Cursor:
+    """Precomputed positional view of one symbol's frame (M6.5 speed-up).
+
+    ``_bars_on`` used to do a per-symbol, per-bar ``ts not in df.index`` +
+    ``df.loc[ts]`` — a pandas label lookup against the FULL frame on every one
+    of ``len(calendar) * len(symbols)`` calls. Built once per run instead: a
+    plain dict from Timestamp -> integer position (O(1) membership + lookup)
+    plus the OHLCV columns as numpy arrays (no per-access pandas overhead).
+    Bit-identical values to ``float(df.loc[ts, col])`` for the same (sym, ts).
+    """
+
+    index_pos: dict[pd.Timestamp, int]
+    open: np.ndarray
+    high: np.ndarray
+    low: np.ndarray
+    close: np.ndarray
+    volume: np.ndarray
 
 
 class BasicEngine:
@@ -51,6 +73,7 @@ class BasicEngine:
         )
 
         store = self._build_store(data, symbols, start, end)
+        cursors = self._build_cursors(store)
         calendar = data.trading_calendar(start, end)
         portfolio = Portfolio(starting_cash)
         pending_orders: list[Order] = []
@@ -61,7 +84,7 @@ class BasicEngine:
 
         last_t = calendar[-1] if calendar else None
         for idx, t in enumerate(calendar):
-            bars_t = self._bars_on(store, symbols, t)
+            bars_t = self._bars_on(cursors, symbols, t)
 
             # 0. Classify the market regime from benchmark history <= t (same firewall as
             #    prices). Done first so entries filled today are tagged look-ahead-free.
@@ -192,22 +215,39 @@ class BasicEngine:
         return store
 
     @staticmethod
-    def _bars_on(store: Mapping[str, pd.DataFrame], symbols: list[str], t: date) -> dict[str, Bar]:
+    def _build_cursors(store: Mapping[str, pd.DataFrame]) -> dict[str, _Cursor]:
+        """Precompute a ``_Cursor`` per symbol once per run (M6.5 speed-up)."""
+        cursors: dict[str, _Cursor] = {}
+        for sym, df in store.items():
+            cursors[sym] = _Cursor(
+                index_pos={ts: i for i, ts in enumerate(df.index)},
+                open=df["open"].to_numpy(dtype=float),
+                high=df["high"].to_numpy(dtype=float),
+                low=df["low"].to_numpy(dtype=float),
+                close=df["close"].to_numpy(dtype=float),
+                volume=df["volume"].to_numpy(dtype=float),
+            )
+        return cursors
+
+    @staticmethod
+    def _bars_on(cursors: Mapping[str, _Cursor], symbols: list[str], t: date) -> dict[str, Bar]:
         ts = pd.Timestamp(t)
         bars: dict[str, Bar] = {}
         for sym in symbols:
-            df = store.get(sym)
-            if df is None or ts not in df.index:
+            cur = cursors.get(sym)
+            if cur is None:
                 continue
-            row = df.loc[ts]
+            i = cur.index_pos.get(ts)
+            if i is None:
+                continue
             bars[sym] = Bar(
                 symbol=sym,
                 ts=t,
-                open=float(row["open"]),
-                high=float(row["high"]),
-                low=float(row["low"]),
-                close=float(row["close"]),
-                volume=float(row["volume"]),
+                open=float(cur.open[i]),
+                high=float(cur.high[i]),
+                low=float(cur.low[i]),
+                close=float(cur.close[i]),
+                volume=float(cur.volume[i]),
             )
         return bars
 

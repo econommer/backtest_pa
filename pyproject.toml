@@ -27,7 +27,12 @@ target-version = "py311"
 line-length = 100
 
 [tool.mypy]
-python_version = "3.11"
+# M6.5: bumped 3.11 -> 3.12 so mypy can parse numpy 2.x's own stub files
+# (they use PEP 695 `type` statements, 3.12+ only) now that basic_engine.py
+# imports numpy directly. Type-checking target only — requires-python and the
+# ruff target-version (both 3.11, the actual minimum supported runtime) are
+# unchanged.
+python_version = "3.12"
 files = ["src"]
 
 [[tool.mypy.overrides]]
