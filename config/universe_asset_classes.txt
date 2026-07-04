@@ -1,0 +1,62 @@
+# Asset-class universes for VCP cross-asset backtests (commodities / FX futures /
+# country indices). One full Bloomberg security per line (yellow key included) --
+# these are NOT bare equity tickers; scripts/fetch_assets_snapshot.py fetches them
+# as-is and caches under the same string as the framework symbol.
+#
+# Spot FX (Curncy BGN) is deliberately absent: no PX_VOLUME -> the session's
+# all-fields row filter returns "no data", and VCP's volume gates couldn't fire
+# anyway. FX exposure comes via CME currency futures generics (real volume).
+#
+# Roll caveat (futures generics): plain generics splice contracts with price
+# jumps at roll, which can fake breakouts/stops. If your terminal's GFUT default
+# is set to a back-adjusted roll (e.g. ratio), the API returns adjusted series --
+# set it BEFORE fetching, and note the setting in the run's Evidence.
+
+# --- commodities: energy ---
+CL1 Comdty
+CO1 Comdty
+NG1 Comdty
+HO1 Comdty
+XB1 Comdty
+# --- commodities: metals ---
+GC1 Comdty
+SI1 Comdty
+HG1 Comdty
+PL1 Comdty
+PA1 Comdty
+# --- commodities: ags / softs ---
+C 1 Comdty
+S 1 Comdty
+W 1 Comdty
+KC1 Comdty
+SB1 Comdty
+CT1 Comdty
+CC1 Comdty
+LC1 Comdty
+# --- FX: CME currency futures generics ---
+EC1 Curncy
+JY1 Curncy
+BP1 Curncy
+AD1 Curncy
+CD1 Curncy
+SF1 Curncy
+PE1 Curncy
+# --- country equity indices ---
+NKY Index
+HSI Index
+KOSPI Index
+TWSE Index
+DAX Index
+UKX Index
+CAC Index
+SMI Index
+AS51 Index
+SPTSX Index
+IBOV Index
+MEXBOL Index
+NIFTY Index
+SX5E Index
+# --- benchmarks (one per report) ---
+BCOM Index
+DXY Curncy
+MXWO Index
