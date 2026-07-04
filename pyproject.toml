@@ -13,6 +13,8 @@ dependencies = ["pandas>=2.0", "numpy>=1.24", "pyyaml>=6.0"]
 # Phase-1 free market-data adapters (yfinance primary; Stooq fallback uses pandas).
 data = ["yfinance>=0.2", "pyarrow>=15"]
 bloomberg = ["blpapi"]
+# Handbook regeneration (scripts/build_handbook.py).
+docs = ["markdown>=3.6"]
 dev = ["pytest>=8.0", "mypy>=1.8", "ruff>=0.4", "yfinance>=0.2", "pyarrow>=15", "types-PyYAML"]
 
 [tool.hatch.build.targets.wheel]
@@ -27,7 +29,12 @@ target-version = "py311"
 line-length = 100
 
 [tool.mypy]
-python_version = "3.11"
+# M6.5: bumped 3.11 -> 3.12 so mypy can parse numpy 2.x's own stub files
+# (they use PEP 695 `type` statements, 3.12+ only) now that basic_engine.py
+# imports numpy directly. Type-checking target only — requires-python and the
+# ruff target-version (both 3.11, the actual minimum supported runtime) are
+# unchanged.
+python_version = "3.12"
 files = ["src"]
 
 [[tool.mypy.overrides]]
@@ -37,3 +44,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "blpapi"
 ignore_missing_imports = true
+# blpapi's bundled hints declare Name-typed params its runtime accepts as str;
+# treat the module as untyped instead of chasing its stubs.
+follow_imports = "skip"
