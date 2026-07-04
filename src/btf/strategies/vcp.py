@@ -183,17 +183,42 @@ class VcpStrategy:
         self.require_rs = require_rs
         # Enough history for the slowest gate (rising SMA150) before we can compute.
         self.warmup_bars = trend_ma + slope_lookback
+        # M6.5 speed-up: every pure detector above is tail-local — it reads at
+        # most this many trailing rows (see tests/test_vcp_fast_identity.py for
+        # the proof). Fetching exactly this many bars once per symbol per bar
+        # (instead of the full history, and instead of twice — once for RS,
+        # once for the gates) is bit-identical to the unbounded computation but
+        # avoids O(history length) pandas slicing/reduction on every bar.
+        self._lookback = max(
+            trend_ma + slope_lookback,
+            rs_lookback + 1,
+            2 * tight_window + 1,
+            base_window + 1,
+            atr_period + 1,
+            trail_ma,
+        )
 
     def on_bar(self, ctx: Context) -> list[Signal]:
         signals: list[Signal] = []
-        rs = self._rs_percentiles(ctx)
         universe = list(ctx.universe)
         # PIT universe (M6): a held stock may have left the index — keep
         # managing its exit; only NEW entries are restricted to members.
         held_outside = [s for s in ctx.positions if s not in set(universe)]
-        for sym in [*universe, *held_outside]:
-            df = ctx.history(sym)
-            if len(df) == 0:
+        all_symbols = [*universe, *held_outside]
+
+        # Fetch each symbol's bounded-tail frame exactly once (was: twice per
+        # symbol — once in _rs_percentiles, once here — over the FULL history).
+        frames: dict[str, pd.DataFrame] = {}
+        for sym in all_symbols:
+            df = ctx.history(sym, self._lookback)
+            if len(df) != 0:
+                frames[sym] = df
+
+        rs = self._rs_percentiles(universe, frames)
+
+        for sym in all_symbols:
+            df = frames.get(sym)
+            if df is None:
                 continue
             if sym in ctx.positions:
                 exit_sig = self._exit_signal(sym, df)
@@ -248,12 +273,21 @@ class VcpStrategy:
         )
 
     # ---- relative strength ---------------------------------------------------
-    def _rs_percentiles(self, ctx: Context) -> dict[str, float]:
-        """Whole-universe ROC ranking → percentile per symbol (IBD-RS approximation)."""
+    def _rs_percentiles(
+        self, universe: list[str], frames: dict[str, pd.DataFrame]
+    ) -> dict[str, float]:
+        """Whole-universe ROC ranking → percentile per symbol (IBD-RS approximation).
+
+        ``frames`` holds each symbol's bounded-tail history (>= rs_lookback + 1
+        rows whenever full history is that long — see ``self._lookback``), so
+        ``roc`` here reads the identical trailing window it would read from the
+        full, unbounded frame (tail-locality; proven in
+        tests/test_vcp_fast_identity.py).
+        """
         rocs: dict[str, float] = {}
-        for sym in ctx.universe:
-            df = ctx.history(sym)
-            if len(df) == 0:
+        for sym in universe:
+            df = frames.get(sym)
+            if df is None or len(df) == 0:
                 continue
             r = roc(df["close"], self.rs_lookback)
             if r is not None:

@@ -66,10 +66,18 @@ class BacktestContext:
         df = self._store.get(symbol)
         if df is None:
             return pd.DataFrame()
-        visible = df.loc[: self._as_of_ts]  # index is sorted → this is strictly <= as_of
-        if lookback is not None:
-            visible = visible.tail(lookback)
-        return visible
+        # M6.5 speed-up: equivalent to `df.loc[:as_of]` (then `.tail(lookback)`)
+        # but O(log n) positional lookup instead of an O(n) label-slice on the
+        # full frame every call — this is on the strategy's per-bar hot path.
+        # `searchsorted(..., side="right")` on the sorted index gives the same
+        # "<= as_of" cut point `.loc[:as_of]` does, including when `as_of`
+        # falls in a gap between bars. Bit-identical to the old implementation
+        # (see tests/test_backtest_context_history.py, which diffs both against
+        # a verbatim copy of the pre-speed-up code across on-bar/gap dates,
+        # short/long/zero lookbacks, and missing symbols).
+        end = df.index.searchsorted(self._as_of_ts, side="right")
+        start = max(0, end - lookback) if lookback is not None else 0
+        return df.iloc[start:end]
 
     def bar(self, symbol: str) -> Bar | None:
         df = self._store.get(symbol)
