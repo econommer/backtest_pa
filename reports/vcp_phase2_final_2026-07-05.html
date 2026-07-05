@@ -1,0 +1,120 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>VCP Phase-2 Credible Report — PIT S&P 500 2010–2025 (Bloomberg)</title>
+<style>
+body{font-family:Segoe UI,system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a1a2e;line-height:1.5}
+pre{background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:12px;overflow-x:auto;font-size:12.5px;line-height:1.45}
+h1{border-bottom:3px solid #2563eb;padding-bottom:.3rem} h2{color:#2563eb;margin-top:2rem}
+.k{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;padding:.35rem .7rem;margin:.15rem;font-size:.95rem}
+.warn{background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:.8rem 1rem}
+.meta{color:#555;font-size:.9rem}
+</style></head><body>
+<h1>VCP — Phase-2 Credible Report</h1>
+<p class="meta">Survivorship-free point-in-time S&amp;P 500 (Bloomberg Desktop API snapshot, monthly membership), 2010-01-01 → 2025-12-31 ·
+826/827 members with bars · generated 2026-07-05 from <code>reports/vcp_phase2_validate_2026-07-04.txt</code> (canonical) ·
+trust-gate: <b>VERIFIED</b> (<code>reports/verify_vcp_fast_2026-07-04.txt</code>) · engine/strategy @ git <code>cf58486</code>, bit-identity-verified speedup (PR #8)</p>
+<p>
+<span class="k">826 trades</span><span class="k">Win 42%</span><span class="k">AvgW +1.26R</span><span class="k">AvgL −0.59R</span>
+<span class="k"><b>Expectancy +0.18R</b></span><span class="k">PF 1.43</span><span class="k">MaxDD 22%</span>
+<span class="k">$100k → $240,776</span><span class="k">OOS +0.11R</span><span class="k">Walk-forward 4/5 positive</span>
+</p>
+<div class="warn"><b>Honest read.</b> Positive per-trade edge that survives out-of-sample (+0.18R IS → +0.11R OOS) and repeats in 4/5 walk-forward
+windows (flat 2013–2019). Parameter surface is smooth around the baseline — except <b>trail_ma</b>: a 20-day trail collapses the edge to
++0.02R (PF 0.97) vs the 50-day's +0.18R, quantitatively supporting the brain's trailing-stops rule. At 1%-risk sizing the strategy's 2.4×
+<i>underperformed</i> SPX buy-and-hold (~5×) in absolute terms — this validates the setup's edge, not a market-beating portfolio at this sizing.
+Caveats: monthly membership granularity; 1 delisted member (1844053D) has no Bloomberg data; the "fewer than 30 trades" line below is an
+unconditional legend, not a claim — 826 trades is statistically meaningful. Not financial advice; study/backtest documentation only.</div>
+<h2>Base run</h2>
+<pre>vcp-phase2-spx-pit  2010-01-01..2025-12-31  827 symbols  strategy=vcp  risk=1.0%/trade
+
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+base run                    826   42%  1.26R  0.59R   0.18R   1.43   22%
+
+final equity: $240,776  (start $100,000)
+[!] fewer than 30 trades — not statistically significant</pre>
+<h2>In-sample / out-of-sample split</h2>
+<pre>In-sample / out-of-sample split — vcp-phase2-spx-pit  (OOS from 2021-01-01)
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+IS  2010-01-01..2020-12-31    584   43%  1.20R  0.60R   0.18R   1.39   22%
+OOS 2021-01-01..2025-12-31    212   35%  1.31R  0.54R   0.11R   1.35   21%
+--------------------------------------------------------------------------
+[!] fewer than 30 trades — not statistically significant
+Read: tune on IS only; OOS is spent once. IS good + OOS flat/negative = overfit.</pre>
+<h2>Walk-forward (5 windows)</h2>
+<pre>Walk-forward — vcp-phase2-spx-pit  (5 windows, fixed params)
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+2010-01-01..2013-03-14      136   47%  1.33R  0.56R   0.33R   1.86   22%
+2013-03-15..2016-05-25      152   32%  1.03R  0.60R  -0.08R   0.95   19%
+2016-05-26..2019-08-07      147   39%  1.06R  0.59R   0.06R   1.05   19%
+2019-08-08..2022-10-18      120   44%  1.35R  0.54R   0.30R   1.66   13%
+2022-10-19..2025-12-31      133   42%  1.41R  0.58R   0.26R   1.73   11%
+--------------------------------------------------------------------------
+Windows with positive expectancy: 4/5
+[!] fewer than 30 trades — not statistically significant
+Read: a real edge repeats across windows; one lucky window carrying the total = fragile.</pre>
+<h2>Parameter sensitivity</h2>
+<pre>Parameter sensitivity — vcp-phase2-spx-pit  (one param varied at a time)
+
+tight_window:
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+  tight_window=6            840   43%  1.36R  0.65R   0.21R   1.69   19%
+  tight_window=8            864   40%  1.30R  0.62R   0.16R   1.31   24%
+  tight_window=10 *         826   42%  1.26R  0.59R   0.18R   1.43   22%
+  tight_window=12           854   39%  1.11R  0.56R   0.09R   1.19   22%
+  tight_window=14           861   38%  1.16R  0.55R   0.10R   1.26   22%
+
+rs_min_percentile:
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+  rs_min_percentile=0.6     903   42%  1.17R  0.59R   0.14R   1.36   23%
+  rs_min_percentile=0.7 *    826   42%  1.26R  0.59R   0.18R   1.43   22%
+  rs_min_percentile=0.8     750   41%  1.30R  0.58R   0.18R   1.49   23%
+
+stop_atr_mult:
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+  stop_atr_mult=0.5         786   40%  1.42R  0.64R   0.19R   1.37   28%
+  stop_atr_mult=1.0 *       826   42%  1.26R  0.59R   0.18R   1.43   22%
+  stop_atr_mult=1.5         898   42%  1.09R  0.52R   0.15R   1.39   22%
+
+trail_ma:
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+  trail_ma=20              1188   40%  0.63R  0.40R   0.02R   0.97   30%
+  trail_ma=50 *             826   42%  1.26R  0.59R   0.18R   1.43   22%
+
+vol_expansion:
+                         Trades   Win%   AvgW   AvgL  Expect     PF  MaxDD
+--------------------------------------------------------------------------
+  vol_expansion=1.1         993   41%  1.29R  0.59R   0.17R   1.38   28%
+  vol_expansion=1.3 *       826   42%  1.26R  0.59R   0.18R   1.43   22%
+  vol_expansion=1.5         673   43%  1.19R  0.58R   0.18R   1.58   20%
+
+* baseline value
+[!] fewer than 30 trades — not statistically significant
+Read: expectancy should degrade gently as a param moves; a cliff next to the baseline means the value was fit to noise.
+
+Data: Bloomberg snapshot — survivorship-free PIT S&amp;P 500 universe (monthly membership granularity; see M6 spec).
+[!] coverage: 1 member(s) without cached bars: 1844053D</pre>
+
+<h2>Trust-gate (snapshot &amp; result integrity)</h2>
+<pre>verify: vcp-phase2-spx-pit  2010-01-01..2025-12-31  strategy=vcp
+
+  [PASS] point-in-time universe non-empty at end date — 503 members on/before 2025-12-31
+  [PASS] coverage &gt; 0 — 826/827 members cached
+  [WARN] coverage complete — 826/827 (100%)
+  [PASS] benchmark curve present, positive, finite — 4024 points
+  [PASS] sampled bars valid (n=25) — all closes present &amp; &gt; 0
+  [PASS] equity curve finite &amp; strictly positive — 4024 days, final $240,776
+  [PASS] metrics == recompute(trades, equity) — consistent
+  [PASS] win rate in [0, 1] — 42%
+  [PASS] summary metrics finite
+  [PASS] all trades have finite R — 826 trades
+  [ok  ] statistically significant sample (&gt;= 30 trades) — 826 trades
+
+VERIFIED — all hard checks passed.
+</pre>
+</body></html>
