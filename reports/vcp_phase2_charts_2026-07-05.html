@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<title>VCP Phase-2 — Credible Report (PIT S&P 500, Bloomberg)</title>
+<title>VCP Phase-2 (M6) — Fast Report</title>
 <style>
 :root{--bg:#0f1419;--card:#1a2129;--ink:#e6e8ea;--mut:#8a949e;--acc:#4fc3f7;--pos:#66bb6a;--neg:#ef5350;--warn:#ffb74d;--line:#2a333d}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -21,15 +21,11 @@ th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line)}
 th{color:var(--mut);font-weight:600} th:first-child,td:first-child{text-align:left}
 td:last-child,th:last-child{text-align:left} tr:hover td{background:#212a34}
 svg{display:block;width:100%;max-width:720px}
-
-pre{background:#141a21;border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.5;color:#c9d2c9}
-.read{background:#241f12;border:1px solid #8a6d3b;border-radius:10px;padding:12px 16px;font-size:14px;margin:14px 0}
-td.num,th.num{font-variant-numeric:tabular-nums}
 </style></head><body>
-<h1>VCP Breakout — Phase-2 Credible Report</h1>
+<h1>VCP Breakout — Phase-2 (M6) Fast Report</h1>
 <div class="sub">S&amp;P 500 point-in-time universe (incl. delisted) · Bloomberg daily bars ·
-2010-01-01 → 2025-12-31 · engine: btf @ cf58486 · full validation suite (base + OOS + walk-forward + sensitivity) · generated 2026-07-05</div>
-<div class="banner" style="background:#12301f;border-color:#66bb6a"><b style="color:#66bb6a">Final</b> — complete snapshot: 826/827 members cached (the one gap, delisted stub 1844053D, has no Bloomberg data). Trust-gate <b style="color:#66bb6a">VERIFIED</b> (all hard checks). Numbers match the canonical validation run <code>reports/vcp_phase2_validate_2026-07-04.txt</code>.</div>
+2010-01-01 → 2025-12-31 · engine: btf · base run only (no validation suite)</div>
+<div class="banner"><b>Tentative</b> — partial snapshot: 826/827 members (100%) have cached bars. 1 still missing; metrics will shift as the fetch completes.</div>
 <div class="cards">
 <div class="card"><div class="v ">826</div><div class="l">Trades</div></div>
 <div class="card"><div class="v ">42%</div><div class="l">Win rate</div></div>
@@ -51,50 +47,6 @@ td.num,th.num{font-variant-numeric:tabular-nums}
 <h2>Last 20 trades</h2>
 <table><thead><tr><th>Symbol</th><th>Entry</th><th>Exit</th><th>R</th><th>Regime</th><th>Exit reason</th></tr></thead>
 <tbody><tr><td>LRCX</td><td>2025-12-22</td><td>2025-12-31</td><td class="neg">-0.16</td><td>bull</td><td>final liquidation</td></tr><tr><td>NTRS</td><td>2025-12-11</td><td>2025-12-31</td><td class="neg">-0.10</td><td>bull</td><td>final liquidation</td></tr><tr><td>WBD</td><td>2025-11-19</td><td>2025-12-31</td><td class="pos">2.01</td><td>bull</td><td>final liquidation</td></tr><tr><td>REGN</td><td>2025-11-14</td><td>2025-12-31</td><td class="pos">0.78</td><td>bull</td><td>final liquidation</td></tr><tr><td>JBHT</td><td>2025-11-05</td><td>2025-12-31</td><td class="pos">1.69</td><td>bull</td><td>final liquidation</td></tr><tr><td>EXPD</td><td>2025-11-05</td><td>2025-12-31</td><td class="pos">0.75</td><td>bull</td><td>final liquidation</td></tr><tr><td>CAT</td><td>2025-10-30</td><td>2025-12-31</td><td class="neg">-0.06</td><td>bull</td><td>final liquidation</td></tr><tr><td>STLD</td><td>2025-10-22</td><td>2025-12-31</td><td class="pos">1.00</td><td>bull</td><td>final liquidation</td></tr><tr><td>MU</td><td>2025-09-08</td><td>2025-12-31</td><td class="pos">7.56</td><td>bull</td><td>final liquidation</td></tr><tr><td>JNJ</td><td>2025-08-05</td><td>2025-12-31</td><td class="pos">3.53</td><td>bull</td><td>final liquidation</td></tr><tr><td>CAH</td><td>2025-11-25</td><td>2025-12-16</td><td class="neg">-1.00</td><td>bull</td><td>stop-out</td></tr><tr><td>GD</td><td>2025-07-24</td><td>2025-11-25</td><td class="pos">0.69</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>GLW</td><td>2025-10-28</td><td>2025-11-14</td><td class="neg">-0.89</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>TTWO</td><td>2025-09-09</td><td>2025-11-10</td><td class="neg">-0.63</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>ALLE</td><td>2025-07-18</td><td>2025-10-24</td><td class="pos">1.45</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>BLK</td><td>2025-10-15</td><td>2025-10-22</td><td class="neg">-0.72</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>MO</td><td>2025-07-31</td><td>2025-10-14</td><td class="pos">0.98</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>CHRW</td><td>2025-08-27</td><td>2025-10-13</td><td class="neg">-0.01</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>AXP</td><td>2025-09-19</td><td>2025-10-13</td><td class="neg">-0.80</td><td>bull</td><td>vcp trail-MA50 exit</td></tr><tr><td>C</td><td>2025-06-25</td><td>2025-10-09</td><td class="pos">2.53</td><td>bull</td><td>vcp trail-MA50 exit</td></tr></tbody></table>
-
-<h2>In-sample / out-of-sample split (OOS from 2021-01-01, spent once)</h2>
-<table><thead><tr><th>Period</th><th class="num">Trades</th><th class="num">Win%</th><th class="num">Avg W</th><th class="num">Avg L</th><th class="num">Expectancy</th><th class="num">PF</th><th style="text-align:right">MaxDD</th></tr></thead><tbody><tr><td>IS 2010-01-01 .. 2020-12-31</td><td class="num">584</td><td class="num">43%</td><td class="num">1.20R</td><td class="num">0.60R</td><td class="num pos">+0.18R</td><td class="num">1.39</td><td class="num" style="text-align:right">22%</td></tr><tr><td>OOS 2021-01-01 .. 2025-12-31</td><td class="num">212</td><td class="num">35%</td><td class="num">1.31R</td><td class="num">0.54R</td><td class="num pos">+0.11R</td><td class="num">1.35</td><td class="num" style="text-align:right">21%</td></tr></tbody></table>
-
-<h2>Walk-forward (5 windows, fixed params — 4/5 positive)</h2>
-<table><thead><tr><th>Window</th><th class="num">Trades</th><th class="num">Win%</th><th class="num">Avg W</th><th class="num">Avg L</th><th class="num">Expectancy</th><th class="num">PF</th><th style="text-align:right">MaxDD</th></tr></thead><tbody><tr><td>2010-01-01 .. 2013-03-14</td><td class="num">136</td><td class="num">47%</td><td class="num">1.33R</td><td class="num">0.56R</td><td class="num pos">+0.33R</td><td class="num">1.86</td><td class="num" style="text-align:right">22%</td></tr><tr><td>2013-03-15 .. 2016-05-25</td><td class="num">152</td><td class="num">32%</td><td class="num">1.03R</td><td class="num">0.60R</td><td class="num neg">−0.08R</td><td class="num">0.95</td><td class="num" style="text-align:right">19%</td></tr><tr><td>2016-05-26 .. 2019-08-07</td><td class="num">147</td><td class="num">39%</td><td class="num">1.06R</td><td class="num">0.59R</td><td class="num pos">+0.06R</td><td class="num">1.05</td><td class="num" style="text-align:right">19%</td></tr><tr><td>2019-08-08 .. 2022-10-18</td><td class="num">120</td><td class="num">44%</td><td class="num">1.35R</td><td class="num">0.54R</td><td class="num pos">+0.30R</td><td class="num">1.66</td><td class="num" style="text-align:right">13%</td></tr><tr><td>2022-10-19 .. 2025-12-31</td><td class="num">133</td><td class="num">42%</td><td class="num">1.41R</td><td class="num">0.58R</td><td class="num pos">+0.26R</td><td class="num">1.73</td><td class="num" style="text-align:right">11%</td></tr></tbody></table>
-
-<h2>Parameter sensitivity (one param at a time; * = baseline)</h2>
-<div class="sub">Expectancy degrades gently on every axis — no cliff next to a baseline value. The one strong
-sensitivity is the exit: <b>trail_ma=20 collapses the edge to +0.02R (PF 0.97)</b> vs the 50-day's +0.18R —
-quantitative support for the trailing-stops rule.</div>
-<pre>tight_window:      6 -> +0.21R (PF 1.69) | 8 -> +0.16R | 10* -> +0.18R | 12 -> +0.09R | 14 -> +0.10R
-rs_min_percentile: 0.6 -> +0.14R | 0.7* -> +0.18R | 0.8 -> +0.18R (PF 1.49)
-stop_atr_mult:     0.5 -> +0.19R (DD 28%) | 1.0* -> +0.18R | 1.5 -> +0.15R
-trail_ma:          20 -> +0.02R (PF 0.97, DD 30%) | 50* -> +0.18R
-vol_expansion:     1.1 -> +0.17R (DD 28%) | 1.3* -> +0.18R | 1.5 -> +0.18R (PF 1.58)</pre>
-
-<h2>Honest read &amp; caveats</h2>
-<div class="read"><b>Honest read.</b> A positive per-trade edge that survives out-of-sample (+0.18R IS → +0.11R OOS,
-win rate 43% → 35%) and repeats in 4 of 5 walk-forward windows — but goes flat through 2013–2019: the edge
-concentrates in strong momentum regimes. At 1%-risk sizing the strategy's +140.8% over 16 years <i>underperformed</i>
-SPX buy-and-hold (+504.2%): this validates the setup's per-trade edge, not a market-beating portfolio at this sizing.</div>
-<ul style="font-size:13.5px;padding-left:20px;line-height:1.7">
-<li>Monthly membership granularity — intramonth index joins/leaves blur to month-ends.</li>
-<li>One delisted member (1844053D) has no Bloomberg data.</li>
-<li>Fills next-day with slippage/commission and gap-through stops; delisted-while-held positions cash out at their last close.</li>
-<li>Point-in-time universe and ≤-as-of history are engine-enforced and tested (no survivorship bias, no look-ahead).</li>
-</ul>
-
-<h2>Trust-gate (snapshot &amp; result integrity)</h2>
-<pre>[PASS] point-in-time universe non-empty at end date - 503 members on/before 2025-12-31
-[PASS] coverage &gt; 0 - 826/827 members cached
-[WARN] coverage complete - 826/827 (100%)
-[PASS] benchmark curve present, positive, finite - 4024 points
-[PASS] sampled bars valid (n=25) - all closes present &amp; &gt; 0
-[PASS] equity curve finite &amp; strictly positive - 4024 days, final $240,776
-[PASS] metrics == recompute(trades, equity) - consistent
-[PASS] win rate in [0, 1] - 42%
-[PASS] summary metrics finite
-[PASS] all trades have finite R - 826 trades
-[ok  ] statistically significant sample (&gt;= 30 trades) - 826 trades
-
-VERIFIED - all hard checks passed.</pre>
-
-<p class="sub" style="margin-top:18px">Charts/cards: scripts/vcp_fast_m6.py · validation tables: reports/vcp_phase2_validate_2026-07-04.txt · trust-gate: reports/verify_vcp_fast_2026-07-04.txt. Originally generated by scripts/vcp_fast_m6.py — same config &amp; engine as
+<p class="sub" style="margin-top:18px">Generated by scripts/vcp_fast_m6.py — same config &amp; engine as
 run_config.py, base leg only. Not financial advice; a study artifact.</p>
 </body></html>
