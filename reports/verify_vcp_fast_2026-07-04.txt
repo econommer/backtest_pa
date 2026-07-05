@@ -1,0 +1,15 @@
+verify: vcp-phase2-spx-pit  2010-01-01..2025-12-31  strategy=vcp
+
+  [PASS] point-in-time universe non-empty at end date — 503 members on/before 2025-12-31
+  [PASS] coverage > 0 — 826/827 members cached
+  [WARN] coverage complete — 826/827 (100%)
+  [PASS] benchmark curve present, positive, finite — 4024 points
+  [PASS] sampled bars valid (n=25) — all closes present & > 0
+  [PASS] equity curve finite & strictly positive — 4024 days, final $240,776
+  [PASS] metrics == recompute(trades, equity) — consistent
+  [PASS] win rate in [0, 1] — 42%
+  [PASS] summary metrics finite
+  [PASS] all trades have finite R — 826 trades
+  [ok  ] statistically significant sample (>= 30 trades) — 826 trades
+
+VERIFIED — all hard checks passed.

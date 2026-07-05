@@ -229,8 +229,8 @@ python scripts/fetch_snapshot.py     # writes ./data_cache/yfinance/*.parquet, t
 | **M3** | Metrics — R-stats / expectancy / drawdown / regime breakdown + benchmark | ✅ done |
 | **M4** | VCP strategy — mechanized rules + first report (biases flagged) | ✅ done |
 | **M5** | Bias defenses — walk-forward, out-of-sample, parameter sensitivity + config-YAML runs | ✅ done |
-| **M6** | **Phase-2 data** — survivorship-free provider, the "credible" report | ⏭ **next** |
-| **M7** | More strategies — Pocket Pivot, Buyable Gap Up — compared on one engine | ⬜ |
+| **M6** | **Phase-2 data** — Bloomberg PIT S&P 500 snapshot (delisted-inclusive), budgeted fetch, the credible report (`reports/vcp_phase2_validate_2026-07-04.txt`) | ✅ done |
+| **M7** | More strategies — Pocket Pivot, Buyable Gap Up — compared on one engine | ⏭ **next** |
 
 ---
 

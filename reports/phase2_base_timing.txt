@@ -1,0 +1,4 @@
+provider load: 4.9s | base run: 2409.9s
+trades=826 final_equity=240775.55
+equity_hash=15706651711386663500
+missing=1

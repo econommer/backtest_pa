@@ -44,7 +44,9 @@ config/         # one YAML = one fully-defined run (vcp_phase1.yaml is the refer
 
 M5 shipped `btf.config` (YAML → `RunConfig` → engine; one YAML = one reproducible run) and `btf.validation` (IS/OOS split, walk-forward consistency, one-at-a-time parameter sensitivity; <30-trade rows flagged). Entry point: `python scripts/run_config.py config/vcp_phase1.yaml --validate`.
 
-Next milestone is **M6: Phase-2 data** — a survivorship-free provider (Norgate preferred, plan §3.3) behind the same `DataProvider` interface, then rerun the VCP config + validation protocol on it to produce the first *credible* report and backfill the brain's Evidence sections.
+**M6 done** (2026-07-05): Phase-2 data via the **Bloomberg Terminal Desktop API** (deviation from the plan's Norgate preference — user owns a Terminal on this machine; Decision Log #4). Snapshot-first: `scripts/fetch_bloomberg_snapshot.py` (dry-run default, persistent usage ledger, 300 new securities/day hard stop) pulls PIT monthly S&P 500 membership + delisted-inclusive daily bars into the parquet cache; `BloombergSnapshotProvider` serves it fully offline with a point-in-time `universe(on)`. The engine cashes out delisted-while-held positions at their last close. M6.5 speedups (bounded strategy lookback, `searchsorted` history, `_bars_on` cursors) are bit-identity-verified; phase-2 base run ≈ 40 min. First credible report: `reports/vcp_phase2_validate_2026-07-04.txt` (826 trades, +0.18R expectancy, OOS +0.11R, 4/5 walk-forward windows positive).
+
+Next milestone is **M7: more strategies** — Pocket Pivot and Buyable Gap Up on the same engine, compared on the Phase-2 snapshot.
 
 ## Tooling
 Recommended dev workflow plugin: **Superpowers** (TDD + planning methodology). Install it inside Claude Code — see `SETUP_SUPERPOWERS.md`.

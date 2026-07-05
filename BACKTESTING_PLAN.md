@@ -2,7 +2,7 @@
 
 > Goal: turn the knowledge in the brain (`wiki/`) into a **reproducible, quantitatively verifiable** backtesting system.
 > Related brain pages: `momentum-trend-trading-system`, each setup's Evidence section, `expectancy-and-position-sizing`, `risk-management-vs-setup`.
-> Status: **M0–M5 implemented** (see §9 and the README roadmap); next is **M6 — Phase-2 data**. Locked decisions are in "Decision Log" below.
+> Status: **M0–M6 implemented** (see §9 and the README roadmap); next is **M7 — more strategies**. Locked decisions are in "Decision Log" below.
 
 ---
 
@@ -13,6 +13,8 @@
 | 1 | Data strategy | **Prototype on free data first (yfinance/Stooq); once the engine works, move to a paid survivorship-free provider (Norgate preferred).** TradingView is a manual validation tool only. |
 | 2 | Engine | **Build a lightweight custom event-driven engine** (best fit for the brain's concepts: R-based sizing, gap-through stops, a generic Strategy interface). |
 | 3 | First VCP scope | **Daily bars + US equities + VCP; Relative Strength approximated by whole-universe ROC ranking** (a faithful approximation of IBD RS — see brain `relative-strength`). **Industry RS deferred to Phase 2** (needs point-in-time industry data, which free sources can't provide reliably; forcing it would introduce look-ahead bias). |
+
+| 4 | Phase-2 provider (2026-07-05) | **Bloomberg Terminal Desktop API instead of Norgate** — user owns a Terminal on this machine (zero incremental cost). Snapshot-first with a persistent usage ledger + hard daily budget so the opaque data cap can't be exceeded; Norgate remains a possible future adapter behind the same `DataProvider` interface. See `docs/superpowers/specs/2026-07-02-m6-phase2-bloomberg-data-design.md`. |
 
 > Q5 resolved in practice: the framework lives in its own git repo (`backtest_pa`), separate from the brain.
 
